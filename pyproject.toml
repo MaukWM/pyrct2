@@ -1,0 +1,25 @@
+[project]
+name = "pyrct2"
+version = "0.1.0"
+description = "Interact with OpenRCT2 from python!"
+readme = "README.md"
+authors = [
+    { name = "Mauk Muller", email = "mauk@elnino.tech" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "pydantic>=2.10",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.9",
+]
+
+[tool.uv]
+package = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
