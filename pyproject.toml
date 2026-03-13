@@ -9,7 +9,11 @@ authors = [
 requires-python = ">=3.13"
 dependencies = [
     "pydantic>=2.10",
+    "click>=8.1",
 ]
+
+[project.scripts]
+pyrct2 = "pyrct2.cli:main"
 
 [dependency-groups]
 dev = [
