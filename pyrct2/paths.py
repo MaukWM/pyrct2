@@ -21,7 +21,7 @@ def get_plugin_dir() -> Path:
         import ctypes.wintypes
 
         buf = ctypes.create_unicode_buffer(ctypes.wintypes.MAX_PATH)
-        ctypes.windll.shell32.SHGetFolderPathW(None, 5, None, 0, buf)  # 5 = CSIDL_PERSONAL (Documents)
+        ctypes.windll.shell32.SHGetFolderPathW(None, 5, None, 0, buf)  # type: ignore[attr-defined]  # Windows-only
         return Path(buf.value) / "OpenRCT2" / "plugin"
     elif system == "Linux":
         config_home = os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))
