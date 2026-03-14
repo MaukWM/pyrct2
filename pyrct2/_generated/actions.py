@@ -528,6 +528,9 @@ class WaterSetHeightParams(BaseModel):
 class _ActionsMixin:
     """Auto-generated game action methods. Do not edit."""
 
+    def execute(self, endpoint: str, params: dict | BaseModel | None = None) -> dict:
+        raise NotImplementedError  # provided by RCT2
+
     def balloon_press(
         self,
         id: int,
