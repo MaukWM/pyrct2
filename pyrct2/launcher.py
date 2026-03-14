@@ -53,14 +53,14 @@ def launch(park_file: str | Path, port: int = DEFAULT_PORT) -> GameInstance:
 
     Blocks until the bridge plugin is ready (up to 30s).
     """
-    park_path = Path(park_file)
-    if not park_path.exists():
-        raise FileNotFoundError(f"Park file not found: {park_path}")
-
     config = load_config()
     binary = config.get("openrct2_path")
     if not binary:
         raise RuntimeError("OpenRCT2 not configured. Run `pyrct2 setup` first.")
+
+    park_path = Path(park_file)
+    if not park_path.exists():
+        raise FileNotFoundError(f"Park file not found: {park_path}")
 
     if _port_in_use(port):
         raise RuntimeError(f"Port {port} already in use. Is OpenRCT2 already running?")
