@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from pyrct2.cli import BRIDGE_VERSION
 from pyrct2.connection import Connection, DEFAULT_HOST, DEFAULT_PORT
 from pyrct2.launcher import GameInstance, launch
-from pyrct2._generated.actions import _ActionsMixin
+from pyrct2._generated.actions import _ActionsMixin, GENERATED_API_VERSION
 
 
 class RCT2(_ActionsMixin):
@@ -80,14 +80,26 @@ class RCT2(_ActionsMixin):
         return self.execute("advance_ticks", {"ticks": ticks})
 
     def _check_bridge_version(self) -> None:
-        """Warn if the connected bridge plugin version doesn't match the expected version."""
+        """Warn if the connected bridge plugin or API version doesn't match expectations."""
         result = self.execute("get_version")
-        plugin_version = result["payload"]["pluginVersion"]
+        payload = result["payload"]
+
+        plugin_version = payload["pluginVersion"]
         expected = BRIDGE_VERSION.lstrip("v")
         if plugin_version != expected:
             warnings.warn(
                 f"Bridge plugin version mismatch: connected to {plugin_version}, "
                 f"expected {expected}. Run `pyrct2 setup` to update.",
+                stacklevel=3,
+            )
+
+        api_version = payload["apiVersion"]
+        if api_version != GENERATED_API_VERSION:
+            warnings.warn(
+                f"API version mismatch: pyrct2 was generated against API v{GENERATED_API_VERSION} "
+                f"but bridge reports v{api_version}. "
+                f"Action calls may fail or behave unexpectedly. "
+                f"Regenerate pyrct2 with openrct2-actiongen.",
                 stacklevel=3,
             )
 
