@@ -1,6 +1,6 @@
 [project]
 name = "pyrct2"
-version = "0.1.0"
+version = "0.1.1"
 description = "Interact with OpenRCT2 from python!"
 readme = "README.md"
 authors = [
@@ -17,6 +17,7 @@ pyrct2 = "pyrct2.cli:main"
 
 [dependency-groups]
 dev = [
+    "pre-commit>=4.5.1",
     "pytest>=8.0",
     "ruff>=0.9",
 ]
@@ -27,3 +28,6 @@ package = true
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 120

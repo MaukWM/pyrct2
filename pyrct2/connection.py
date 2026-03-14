@@ -11,7 +11,12 @@ DEFAULT_TIMEOUT = 10.0
 class Connection:
     """Single TCP connection to an openrct2-bridge plugin instance."""
 
-    def __init__(self, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, timeout: float = DEFAULT_TIMEOUT):
+    def __init__(
+        self,
+        host: str = DEFAULT_HOST,
+        port: int = DEFAULT_PORT,
+        timeout: float = DEFAULT_TIMEOUT,
+    ):
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._socket.settimeout(timeout)
         self._socket.connect((host, port))

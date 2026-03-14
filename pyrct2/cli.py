@@ -4,13 +4,16 @@ import urllib.request
 
 import click
 
-from pyrct2.paths import find_openrct2_binary, get_plugin_dir, save_config, validate_openrct2_binary
+from pyrct2.paths import (
+    find_openrct2_binary,
+    get_plugin_dir,
+    save_config,
+    validate_openrct2_binary,
+)
 
 BRIDGE_VERSION = "v1.0.1"
 BRIDGE_FILENAME = "openrct2-bridge.js"
-BRIDGE_DOWNLOAD_URL = (
-    f"https://github.com/MaukWM/openrct2-bridge/releases/download/{BRIDGE_VERSION}/{BRIDGE_FILENAME}"
-)
+BRIDGE_DOWNLOAD_URL = f"https://github.com/MaukWM/openrct2-bridge/releases/download/{BRIDGE_VERSION}/{BRIDGE_FILENAME}"
 
 
 @click.group()

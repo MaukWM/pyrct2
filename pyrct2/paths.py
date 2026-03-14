@@ -19,6 +19,7 @@ def get_plugin_dir() -> Path:
         return Path.home() / "Library" / "Application Support" / "OpenRCT2" / "plugin"
     elif system == "Windows":
         import ctypes.wintypes
+
         buf = ctypes.create_unicode_buffer(ctypes.wintypes.MAX_PATH)
         ctypes.windll.shell32.SHGetFolderPathW(None, 5, None, 0, buf)  # 5 = CSIDL_PERSONAL (Documents)
         return Path(buf.value) / "OpenRCT2" / "plugin"
@@ -68,7 +69,9 @@ def _find_macos() -> Path | None:
     try:
         result = subprocess.run(
             ["mdfind", "kMDItemFSName == 'OpenRCT2.app'"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         for line in result.stdout.strip().splitlines():
             binary = Path(line) / "Contents" / "MacOS" / "OpenRCT2"
@@ -81,11 +84,14 @@ def _find_macos() -> Path | None:
 
 def _find_windows() -> Path | None:
     """Check known installation directories on Windows."""
+    program_files = Path(os.environ.get("PROGRAMFILES", "C:/Program Files"))
+    program_files_x86 = Path(os.environ.get("PROGRAMFILES(X86)", "C:/Program Files (x86)"))
+    binary = "openrct2.com"
+
     candidates = [
-        Path(os.environ.get("PROGRAMFILES", "C:/Program Files")) / "OpenRCT2" / "openrct2.com",
-        Path(os.environ.get("PROGRAMFILES(X86)", "C:/Program Files (x86)")) / "OpenRCT2" / "openrct2.com",
-        Path(os.environ.get("PROGRAMFILES(X86)", "C:/Program Files (x86)")) / "GOG Galaxy" / "Games"
-        / "RollerCoaster Tycoon 2 Triple Thrill Pack" / "OpenRCT2" / "openrct2.com",
+        program_files / "OpenRCT2" / binary,
+        program_files_x86 / "OpenRCT2" / binary,
+        program_files_x86 / "GOG Galaxy" / "Games" / "RollerCoaster Tycoon 2 Triple Thrill Pack" / "OpenRCT2" / binary,
     ]
     for candidate in candidates:
         if candidate.exists():
@@ -98,7 +104,9 @@ def validate_openrct2_binary(path: Path) -> str:
     try:
         result = subprocess.run(
             [str(path), "--version"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         first_line = result.stdout.strip().splitlines()[0]
         if not first_line.startswith("OpenRCT2"):
