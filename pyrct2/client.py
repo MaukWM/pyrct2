@@ -5,12 +5,15 @@ from __future__ import annotations
 import warnings
 from pathlib import Path
 
+from pydantic import BaseModel
+
 from pyrct2.cli import BRIDGE_VERSION
 from pyrct2.connection import Connection, DEFAULT_HOST, DEFAULT_PORT
 from pyrct2.launcher import GameInstance, launch
+from pyrct2._generated.actions import _ActionsMixin
 
 
-class RCT2:
+class RCT2(_ActionsMixin):
     """Client for interacting with an OpenRCT2 game via the bridge plugin.
 
     Two modes of operation:
@@ -48,10 +51,12 @@ class RCT2:
         client._check_bridge_version()
         return client
 
-    def execute(self, endpoint: str, params: dict | None = None) -> dict:
+    def execute(self, endpoint: str, params: dict | BaseModel | None = None) -> dict:
         """Send a command to the bridge and return the response."""
         if self._instance is not None:
             self._instance.check_alive()
+        if isinstance(params, BaseModel):
+            params = params.model_dump()
         return self._connection.send(endpoint, params)
 
     def get_status(self) -> dict:

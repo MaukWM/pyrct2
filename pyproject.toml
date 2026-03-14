@@ -1,6 +1,6 @@
 [project]
 name = "pyrct2"
-version = "0.1.1"
+version = "0.1.2"
 description = "Interact with OpenRCT2 from python!"
 readme = "README.md"
 authors = [
@@ -31,3 +31,4 @@ build-backend = "hatchling.build"
 
 [tool.ruff]
 line-length = 120
+exclude = ["pyrct2/_generated"]
