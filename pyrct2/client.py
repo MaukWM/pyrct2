@@ -4,16 +4,18 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel
 
 from pyrct2.cli import BRIDGE_VERSION
 from pyrct2.connection import Connection, DEFAULT_HOST, DEFAULT_PORT
 from pyrct2.launcher import GameInstance, launch
-from pyrct2._generated.actions import _ActionsMixin, GENERATED_API_VERSION
+from pyrct2._generated.actions import ActionsProxy, GENERATED_API_VERSION
+from pyrct2._generated.state import StateProxy
 
 
-class RCT2(_ActionsMixin):
+class RCT2:
     """Client for interacting with an OpenRCT2 game via the bridge plugin.
 
     Two modes of operation:
@@ -24,6 +26,8 @@ class RCT2(_ActionsMixin):
     def __init__(self, connection: Connection, instance: GameInstance | None = None):
         self._connection = connection
         self._instance = instance
+        self.actions = ActionsProxy(self)
+        self.state = StateProxy(self)
 
     @classmethod
     def launch(cls, park_file: str | Path, port: int = DEFAULT_PORT, start_paused: bool = True) -> RCT2:
@@ -74,6 +78,13 @@ class RCT2(_ActionsMixin):
     def unpause(self) -> dict:
         """Unpause the game."""
         return self.execute("unpause")
+
+    def _query(self, endpoint: str) -> Any:
+        """Send a state query and return the payload, raising on failure."""
+        resp = self.execute(endpoint)
+        if not resp.get("success"):
+            raise RuntimeError(f"Query {endpoint!r} failed: {resp.get('error', resp)}")
+        return resp.get("payload")
 
     def advance_ticks(self, ticks: int) -> dict:
         """Advance the game by N ticks (unpause → count → re-pause)."""
