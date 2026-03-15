@@ -43,13 +43,16 @@ class RCT2:
         self.state = StateProxy(self)
 
     @classmethod
-    def launch(cls, park_file: str | Path, port: int = DEFAULT_PORT, start_paused: bool = True) -> RCT2:
-        """Launch OpenRCT2 headless and return a connected client.
+    def launch(
+        cls, park_file: str | Path, port: int = DEFAULT_PORT, start_paused: bool = True, headless: bool = True
+    ) -> RCT2:
+        """Launch OpenRCT2 and return a connected client.
 
         If start_paused is True (default), the game is paused immediately after
         the bridge becomes ready. A few scenario ticks (~10-20) may have elapsed.
+        Set headless=False to launch with the game window visible.
         """
-        instance = launch(park_file, port)
+        instance = launch(park_file, port, headless=headless)
         client = cls(instance.connection, instance)
         client._check_bridge_version()
         if start_paused:

@@ -1,8 +1,9 @@
-"""Launch OpenRCT2 in headless mode and wait for plugin readiness."""
+"""Launch OpenRCT2 and wait for plugin readiness."""
 
 import atexit
 import socket
 import subprocess
+import threading
 import time
 from pathlib import Path
 
@@ -19,7 +20,15 @@ class GameInstance:
     def __init__(self, process: subprocess.Popen, connection: Connection):
         self._process = process
         self.connection = connection
+        self.logs: list[str] = []
+        self._log_thread = threading.Thread(target=self._capture_logs, daemon=True)
+        self._log_thread.start()
         atexit.register(self._cleanup)
+
+    def _capture_logs(self) -> None:
+        """Read stdout+stderr from the game process into self.logs."""
+        for line in self._process.stdout:  # type: ignore[union-attr]
+            self.logs.append(line.rstrip("\n"))
 
     def check_alive(self) -> None:
         """Raise if the OpenRCT2 process has exited."""
@@ -30,6 +39,7 @@ class GameInstance:
         self.connection.close()
         self._process.terminate()
         self._process.wait(timeout=5)
+        self._log_thread.join(timeout=2)
         atexit.unregister(self._cleanup)
 
     def _cleanup(self) -> None:
@@ -48,10 +58,11 @@ class GameInstance:
         self.stop()
 
 
-def launch(park_file: str | Path, port: int = DEFAULT_PORT) -> GameInstance:
-    """Launch OpenRCT2 headless and return a connected GameInstance.
+def launch(park_file: str | Path, port: int = DEFAULT_PORT, headless: bool = True) -> GameInstance:
+    """Launch OpenRCT2 and return a connected GameInstance.
 
     Blocks until the bridge plugin is ready (up to 30s).
+    Set headless=False to launch with the game window visible.
     """
     config = load_config()
     binary = config.get("openrct2_path")
@@ -65,10 +76,15 @@ def launch(park_file: str | Path, port: int = DEFAULT_PORT) -> GameInstance:
     if _port_in_use(port):
         raise RuntimeError(f"Port {port} already in use. Is OpenRCT2 already running?")
 
+    cmd = [binary, "host", str(park_path)]
+    if headless:
+        cmd.append("--headless")
+
     process = subprocess.Popen(
-        [binary, "host", str(park_path), "--headless"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
     )
 
     connection = _wait_for_bridge(port, process)
@@ -107,7 +123,6 @@ def _wait_for_bridge(port: int, process: subprocess.Popen) -> Connection:
                 return conn
             conn.close()
         except (ConnectionRefusedError, socket.timeout, OSError):
-            # Bridge not ready yet — retry after interval
             pass
 
         time.sleep(HEALTH_POLL_INTERVAL)

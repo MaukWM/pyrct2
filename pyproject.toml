@@ -1,6 +1,6 @@
 [project]
 name = "pyrct2"
-version = "0.2.2"
+version = "0.2.3"
 description = "Interact with OpenRCT2 from python!"
 license = { text = "MIT" }
 readme = "README.md"
