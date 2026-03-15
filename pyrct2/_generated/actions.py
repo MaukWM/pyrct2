@@ -7,7 +7,8 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+from pydantic.alias_generators import to_camel
 
 # API version this file was generated against.
 # pyrct2 compares this against get_version() at connect time.
@@ -18,10 +19,15 @@ GENERATED_API_VERSION: int = 110
 # Action parameter models
 # ---------------------------------------------------------------------------
 
-class BalloonPressParams(BaseModel):
+class _ActionParams(BaseModel):
+    """Base for all action parameter models. Serializes fields as camelCase."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+class BalloonPressParams(_ActionParams):
     id: int
 
-class BannerPlaceParams(BaseModel):
+class BannerPlaceParams(_ActionParams):
     x: int
     y: int
     z: int
@@ -29,52 +35,52 @@ class BannerPlaceParams(BaseModel):
     object: int
     primary_colour: int
 
-class BannerRemoveParams(BaseModel):
+class BannerRemoveParams(_ActionParams):
     x: int
     y: int
     z: int
     direction: int
 
-class BannerSetColourParams(BaseModel):
+class BannerSetColourParams(_ActionParams):
     x: int
     y: int
     z: int
     direction: int
     primary_colour: int
 
-class BannerSetNameParams(BaseModel):
+class BannerSetNameParams(_ActionParams):
     id: int
     name: str
 
-class BannerSetStyleParams(BaseModel):
+class BannerSetStyleParams(_ActionParams):
     id: int
     type: int
     parameter: int
 
-class CheatSetParams(BaseModel):
+class CheatSetParams(_ActionParams):
     type: int
     param1: int
     param2: int
 
-class ClearParams(BaseModel):
+class ClearParams(_ActionParams):
     x1: int
     y1: int
     x2: int
     y2: int
     items_to_clear: int
 
-class FootpathAdditionPlaceParams(BaseModel):
+class FootpathAdditionPlaceParams(_ActionParams):
     x: int
     y: int
     z: int
     object: int
 
-class FootpathAdditionRemoveParams(BaseModel):
+class FootpathAdditionRemoveParams(_ActionParams):
     x: int
     y: int
     z: int
 
-class FootpathLayoutPlaceParams(BaseModel):
+class FootpathLayoutPlaceParams(_ActionParams):
     x: int
     y: int
     z: int
@@ -85,7 +91,7 @@ class FootpathLayoutPlaceParams(BaseModel):
     edges: int
     construct_flags: int
 
-class FootpathPlaceParams(BaseModel):
+class FootpathPlaceParams(_ActionParams):
     x: int
     y: int
     z: int
@@ -96,30 +102,30 @@ class FootpathPlaceParams(BaseModel):
     slope_direction: int
     construct_flags: int
 
-class FootpathRemoveParams(BaseModel):
+class FootpathRemoveParams(_ActionParams):
     x: int
     y: int
     z: int
 
-class GameSetSpeedParams(BaseModel):
+class GameSetSpeedParams(_ActionParams):
     speed: int
 
-class GuestSetFlagsParams(BaseModel):
+class GuestSetFlagsParams(_ActionParams):
     peep: int
     guest_flags: int
 
-class GuestSetNameParams(BaseModel):
+class GuestSetNameParams(_ActionParams):
     peep: int
     name: str
 
-class LandBuyRightsParams(BaseModel):
+class LandBuyRightsParams(_ActionParams):
     x1: int
     y1: int
     x2: int
     y2: int
     setting: int
 
-class LandLowerParams(BaseModel):
+class LandLowerParams(_ActionParams):
     x: int
     y: int
     x1: int
@@ -128,7 +134,7 @@ class LandLowerParams(BaseModel):
     y2: int
     selection_type: int
 
-class LandRaiseParams(BaseModel):
+class LandRaiseParams(_ActionParams):
     x: int
     y: int
     x1: int
@@ -137,13 +143,13 @@ class LandRaiseParams(BaseModel):
     y2: int
     selection_type: int
 
-class LandSetHeightParams(BaseModel):
+class LandSetHeightParams(_ActionParams):
     x: int
     y: int
     height: int
     style: int
 
-class LandSetRightsParams(BaseModel):
+class LandSetRightsParams(_ActionParams):
     x1: int
     y1: int
     x2: int
@@ -151,7 +157,7 @@ class LandSetRightsParams(BaseModel):
     setting: int
     ownership: int
 
-class LandSmoothParams(BaseModel):
+class LandSmoothParams(_ActionParams):
     x: int
     y: int
     x1: int
@@ -161,7 +167,7 @@ class LandSmoothParams(BaseModel):
     selection_type: int
     is_lowering: bool
 
-class LargeSceneryPlaceParams(BaseModel):
+class LargeSceneryPlaceParams(_ActionParams):
     x: int
     y: int
     z: int
@@ -171,14 +177,14 @@ class LargeSceneryPlaceParams(BaseModel):
     secondary_colour: int
     tertiary_colour: int
 
-class LargeSceneryRemoveParams(BaseModel):
+class LargeSceneryRemoveParams(_ActionParams):
     x: int
     y: int
     z: int
     direction: int
     tile_index: int
 
-class LargeScenerySetColourParams(BaseModel):
+class LargeScenerySetColourParams(_ActionParams):
     x: int
     y: int
     z: int
@@ -188,24 +194,24 @@ class LargeScenerySetColourParams(BaseModel):
     secondary_colour: int
     tertiary_colour: int
 
-class LoadOrQuitParams(BaseModel):
+class LoadOrQuitParams(_ActionParams):
     mode: int
     save_prompt_mode: int
 
-class MapChangeSizeParams(BaseModel):
+class MapChangeSizeParams(_ActionParams):
     target_size_x: int
     target_size_y: int
     shift_x: int
     shift_y: int
 
-class MazePlaceTrackParams(BaseModel):
+class MazePlaceTrackParams(_ActionParams):
     x: int
     y: int
     z: int
     ride: int
     maze_entry: int
 
-class MazeSetTrackParams(BaseModel):
+class MazeSetTrackParams(_ActionParams):
     x: int
     y: int
     z: int
@@ -214,14 +220,14 @@ class MazeSetTrackParams(BaseModel):
     mode: int
     is_initial_placement: bool
 
-class NetworkModifyGroupParams(BaseModel):
+class NetworkModifyGroupParams(_ActionParams):
     type: int
     group_id: int
     name: str
     permission_index: int
     permission_state: int
 
-class ParkEntrancePlaceParams(BaseModel):
+class ParkEntrancePlaceParams(_ActionParams):
     x: int
     y: int
     z: int
@@ -230,39 +236,39 @@ class ParkEntrancePlaceParams(BaseModel):
     entrance_object: int
     footpath_type_is_legacy: bool
 
-class ParkEntranceRemoveParams(BaseModel):
+class ParkEntranceRemoveParams(_ActionParams):
     x: int
     y: int
     z: int
 
-class ParkMarketingParams(BaseModel):
+class ParkMarketingParams(_ActionParams):
     type: int
     item: int
     duration: int
 
-class ParkSetDateParams(BaseModel):
+class ParkSetDateParams(_ActionParams):
     year: int
     month: int
     day: int
 
-class ParkSetEntranceFeeParams(BaseModel):
+class ParkSetEntranceFeeParams(_ActionParams):
     value: int
 
-class ParkSetLoanParams(BaseModel):
+class ParkSetLoanParams(_ActionParams):
     value: int
 
-class ParkSetNameParams(BaseModel):
+class ParkSetNameParams(_ActionParams):
     name: str
 
-class ParkSetParameterParams(BaseModel):
+class ParkSetParameterParams(_ActionParams):
     parameter: int
     value: int
 
-class ParkSetResearchFundingParams(BaseModel):
+class ParkSetResearchFundingParams(_ActionParams):
     priorities: int
     funding_amount: int
 
-class PeepPickupParams(BaseModel):
+class PeepPickupParams(_ActionParams):
     type: int
     id: int
     x: int
@@ -270,20 +276,20 @@ class PeepPickupParams(BaseModel):
     z: int
     player_id: int
 
-class PeepSpawnPlaceParams(BaseModel):
+class PeepSpawnPlaceParams(_ActionParams):
     x: int
     y: int
     z: int
     direction: int
 
-class PlayerKickParams(BaseModel):
+class PlayerKickParams(_ActionParams):
     player_id: int
 
-class PlayerSetGroupParams(BaseModel):
+class PlayerSetGroupParams(_ActionParams):
     player_id: int
     group_id: int
 
-class RideCreateParams(BaseModel):
+class RideCreateParams(_ActionParams):
     ride_type: int
     ride_object: int
     entrance_object: int
@@ -291,11 +297,11 @@ class RideCreateParams(BaseModel):
     colour2: int
     inspection_interval: int
 
-class RideDemolishParams(BaseModel):
+class RideDemolishParams(_ActionParams):
     ride: int
     modify_type: int
 
-class RideEntranceExitPlaceParams(BaseModel):
+class RideEntranceExitPlaceParams(_ActionParams):
     x: int
     y: int
     direction: int
@@ -303,25 +309,25 @@ class RideEntranceExitPlaceParams(BaseModel):
     station: int
     is_exit: bool
 
-class RideEntranceExitRemoveParams(BaseModel):
+class RideEntranceExitRemoveParams(_ActionParams):
     x: int
     y: int
     ride: int
     station: int
     is_exit: bool
 
-class RideFreezeRatingParams(BaseModel):
+class RideFreezeRatingParams(_ActionParams):
     ride: int
     type: int
     value: int
 
-class RideSetAppearanceParams(BaseModel):
+class RideSetAppearanceParams(_ActionParams):
     ride: int
     type: int
     value: int
     index: int
 
-class RideSetColourSchemeParams(BaseModel):
+class RideSetColourSchemeParams(_ActionParams):
     x: int
     y: int
     z: int
@@ -329,45 +335,45 @@ class RideSetColourSchemeParams(BaseModel):
     track_type: int
     colour_scheme: int
 
-class RideSetNameParams(BaseModel):
+class RideSetNameParams(_ActionParams):
     ride: int
     name: str
 
-class RideSetPriceParams(BaseModel):
+class RideSetPriceParams(_ActionParams):
     ride: int
     price: int
     is_primary_price: bool
 
-class RideSetSettingParams(BaseModel):
+class RideSetSettingParams(_ActionParams):
     ride: int
     setting: int
     value: int
 
-class RideSetStatusParams(BaseModel):
+class RideSetStatusParams(_ActionParams):
     ride: int
     status: int
 
-class RideSetVehicleParams(BaseModel):
+class RideSetVehicleParams(_ActionParams):
     ride: int
     type: int
     value: int
     colour: int
 
-class ScenarioSetSettingParams(BaseModel):
+class ScenarioSetSettingParams(_ActionParams):
     setting: int
     value: int
 
-class SignSetNameParams(BaseModel):
+class SignSetNameParams(_ActionParams):
     id: int
     name: str
 
-class SignSetStyleParams(BaseModel):
+class SignSetStyleParams(_ActionParams):
     id: int
     main_colour: int
     text_colour: int
     is_large: bool
 
-class SmallSceneryPlaceParams(BaseModel):
+class SmallSceneryPlaceParams(_ActionParams):
     x: int
     y: int
     z: int
@@ -378,14 +384,14 @@ class SmallSceneryPlaceParams(BaseModel):
     secondary_colour: int
     tertiary_colour: int
 
-class SmallSceneryRemoveParams(BaseModel):
+class SmallSceneryRemoveParams(_ActionParams):
     x: int
     y: int
     z: int
     object: int
     quadrant: int
 
-class SmallScenerySetColourParams(BaseModel):
+class SmallScenerySetColourParams(_ActionParams):
     x: int
     y: int
     z: int
@@ -395,32 +401,32 @@ class SmallScenerySetColourParams(BaseModel):
     secondary_colour: int
     tertiary_colour: int
 
-class StaffFireParams(BaseModel):
+class StaffFireParams(_ActionParams):
     id: int
 
-class StaffHireNewParams(BaseModel):
+class StaffHireNewParams(_ActionParams):
     auto_position: bool
     staff_type: int
     costume_index: int
     staff_orders: int
 
-class StaffSetColourParams(BaseModel):
+class StaffSetColourParams(_ActionParams):
     staff_type: int
     colour: int
 
-class StaffSetCostumeParams(BaseModel):
+class StaffSetCostumeParams(_ActionParams):
     id: int
     costume: int
 
-class StaffSetNameParams(BaseModel):
+class StaffSetNameParams(_ActionParams):
     id: int
     name: str
 
-class StaffSetOrdersParams(BaseModel):
+class StaffSetOrdersParams(_ActionParams):
     id: int
     staff_orders: int
 
-class StaffSetPatrolAreaParams(BaseModel):
+class StaffSetPatrolAreaParams(_ActionParams):
     id: int
     x1: int
     y1: int
@@ -428,7 +434,7 @@ class StaffSetPatrolAreaParams(BaseModel):
     y2: int
     mode: int
 
-class SurfaceSetStyleParams(BaseModel):
+class SurfaceSetStyleParams(_ActionParams):
     x1: int
     y1: int
     x2: int
@@ -436,20 +442,20 @@ class SurfaceSetStyleParams(BaseModel):
     surface_style: int
     edge_style: int
 
-class TileModifyParams(BaseModel):
+class TileModifyParams(_ActionParams):
     x: int
     y: int
     setting: int
     value1: int
     value2: int
 
-class TrackDesignParams(BaseModel):
+class TrackDesignParams(_ActionParams):
     x: int
     y: int
     z: int
     direction: int
 
-class TrackPlaceParams(BaseModel):
+class TrackPlaceParams(_ActionParams):
     x: int
     y: int
     z: int
@@ -463,7 +469,7 @@ class TrackPlaceParams(BaseModel):
     track_place_flags: int
     is_from_track_design: bool
 
-class TrackRemoveParams(BaseModel):
+class TrackRemoveParams(_ActionParams):
     x: int
     y: int
     z: int
@@ -471,14 +477,14 @@ class TrackRemoveParams(BaseModel):
     track_type: int
     sequence: int
 
-class TrackSetBrakeSpeedParams(BaseModel):
+class TrackSetBrakeSpeedParams(_ActionParams):
     x: int
     y: int
     z: int
     track_type: int
     brake_speed: int
 
-class WallPlaceParams(BaseModel):
+class WallPlaceParams(_ActionParams):
     x: int
     y: int
     z: int
@@ -488,13 +494,13 @@ class WallPlaceParams(BaseModel):
     secondary_colour: int
     tertiary_colour: int
 
-class WallRemoveParams(BaseModel):
+class WallRemoveParams(_ActionParams):
     x: int
     y: int
     z: int
     direction: int
 
-class WallSetColourParams(BaseModel):
+class WallSetColourParams(_ActionParams):
     x: int
     y: int
     z: int
@@ -503,19 +509,19 @@ class WallSetColourParams(BaseModel):
     secondary_colour: int
     tertiary_colour: int
 
-class WaterLowerParams(BaseModel):
+class WaterLowerParams(_ActionParams):
     x1: int
     y1: int
     x2: int
     y2: int
 
-class WaterRaiseParams(BaseModel):
+class WaterRaiseParams(_ActionParams):
     x1: int
     y1: int
     x2: int
     y2: int
 
-class WaterSetHeightParams(BaseModel):
+class WaterSetHeightParams(_ActionParams):
     x: int
     y: int
     height: int

@@ -73,7 +73,7 @@ class RCT2:
         if self._instance is not None:
             self._instance.check_alive()
         if isinstance(params, BaseModel):
-            params = params.model_dump()
+            params = params.model_dump(by_alias=True)
         return self._connection.send(endpoint, params)
 
     def get_status(self) -> dict:
