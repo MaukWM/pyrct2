@@ -1,7 +1,8 @@
 [project]
 name = "pyrct2"
-version = "0.1.2"
+version = "0.2.0"
 description = "Interact with OpenRCT2 from python!"
+license = { text = "MIT" }
 readme = "README.md"
 authors = [
     { name = "Mauk Muller", email = "mauk@elnino.tech" }
