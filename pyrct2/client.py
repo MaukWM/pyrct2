@@ -33,6 +33,9 @@ class RCT2:
     - RCT2.connect(host, port) — attaches to an already-running instance
     """
 
+    actions: ActionsProxy
+    state: StateProxy
+
     def __init__(self, connection: Connection, instance: GameInstance | None = None):
         self._connection = connection
         self._instance = instance
