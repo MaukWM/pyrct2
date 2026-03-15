@@ -11,8 +11,18 @@ from pydantic import BaseModel
 from pyrct2.cli import BRIDGE_VERSION
 from pyrct2.connection import Connection, DEFAULT_HOST, DEFAULT_PORT
 from pyrct2.launcher import GameInstance, launch
-from pyrct2._generated.actions import ActionsProxy, GENERATED_API_VERSION
+from pyrct2._generated.actions import ActionsProxy
+from pyrct2._generated.actions import GENERATED_API_VERSION as _ACTIONS_API_VERSION
 from pyrct2._generated.state import StateProxy
+from pyrct2._generated.state import GENERATED_API_VERSION as _STATE_API_VERSION
+
+if _ACTIONS_API_VERSION != _STATE_API_VERSION:
+    raise RuntimeError(
+        f"Generated files are out of sync: actions.py is API v{_ACTIONS_API_VERSION} "
+        f"but state.py is API v{_STATE_API_VERSION}. Regenerate both together."
+    )
+
+GENERATED_API_VERSION = _ACTIONS_API_VERSION
 
 
 class RCT2:

@@ -8,6 +8,9 @@ from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, Field
 
+# API version this file was generated against.
+GENERATED_API_VERSION: int = 110
+
 # ── Union variant models ──────────────────────────────────────────────────────
 
 class RideResearchItem(BaseModel):
