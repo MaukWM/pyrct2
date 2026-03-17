@@ -6,6 +6,7 @@ import click
 
 from pyrct2.paths import (
     find_openrct2_binary,
+    get_game_path_from_openrct2,
     get_plugin_dir,
     save_config,
     validate_openrct2_binary,
@@ -32,8 +33,16 @@ def setup() -> None:
         return
 
     version = validate_openrct2_binary(binary)
-    save_config({"openrct2_path": str(binary)})
     click.echo(f"Found {version} at {binary}")
+
+    # Detect RCT2 game data path from OpenRCT2's config.ini
+    game_path = get_game_path_from_openrct2()
+    if game_path is None:
+        click.echo("Error: Could not find RCT2 game data. Is OpenRCT2 configured with a valid game_path in config.ini?")
+        return
+
+    click.echo(f"Found RCT2 game data at {game_path}")
+    save_config({"openrct2_path": str(binary), "rct2_path": str(game_path)})
 
     # Install bridge plugin
     plugin_dir = get_plugin_dir()

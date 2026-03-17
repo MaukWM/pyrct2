@@ -1,5 +1,6 @@
 """OS-specific path resolution for OpenRCT2 directories."""
 
+import configparser
 import json
 import os
 import platform
@@ -11,23 +12,45 @@ CONFIG_DIR = Path.home() / ".pyrct2"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
 
-def get_plugin_dir() -> Path:
-    """Return the OpenRCT2 plugin directory for the current OS."""
+def get_openrct2_user_dir() -> Path:
+    """Return the OpenRCT2 user data directory for the current OS."""
     system = platform.system()
 
     if system == "Darwin":
-        return Path.home() / "Library" / "Application Support" / "OpenRCT2" / "plugin"
+        return Path.home() / "Library" / "Application Support" / "OpenRCT2"
     elif system == "Windows":
         import ctypes.wintypes
 
         buf = ctypes.create_unicode_buffer(ctypes.wintypes.MAX_PATH)
         ctypes.windll.shell32.SHGetFolderPathW(None, 5, None, 0, buf)  # type: ignore[attr-defined]  # Windows-only
-        return Path(buf.value) / "OpenRCT2" / "plugin"
+        return Path(buf.value) / "OpenRCT2"
     elif system == "Linux":
         config_home = os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))
-        return Path(config_home) / "OpenRCT2" / "plugin"
+        return Path(config_home) / "OpenRCT2"
     else:
         raise RuntimeError(f"Unsupported platform: {system}")
+
+
+def get_plugin_dir() -> Path:
+    """Return the OpenRCT2 plugin directory for the current OS."""
+    return get_openrct2_user_dir() / "plugin"
+
+
+def get_game_path_from_openrct2() -> Path | None:
+    """Read game_path from OpenRCT2's config.ini."""
+    config_ini = get_openrct2_user_dir() / "config.ini"
+    if not config_ini.exists():
+        return None
+
+    parser = configparser.ConfigParser()
+    parser.read(config_ini)
+
+    value = parser.get("general", "game_path", fallback=None)
+    if value:
+        path = Path(value.strip('"'))
+        if path.exists():
+            return path
+    return None
 
 
 def find_openrct2_binary() -> Path | None:
