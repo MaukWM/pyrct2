@@ -22,6 +22,17 @@ class Connection:
         self._socket.connect((host, port))
         self._buffer = ""
 
+    def _recv_line(self) -> str:
+        """Read one complete newline-delimited line from the socket."""
+        while "\n" not in self._buffer:
+            chunk = self._socket.recv(4096).decode()
+            if not chunk:
+                raise ConnectionError("Bridge closed the connection")
+            self._buffer += chunk
+
+        line, self._buffer = self._buffer.split("\n", 1)
+        return line
+
     def send(self, endpoint: str, params: dict | None = None) -> dict:
         """Send a request and return the parsed response."""
         msg: dict = {"endpoint": endpoint}
@@ -30,14 +41,12 @@ class Connection:
 
         self._socket.sendall(json.dumps(msg).encode() + b"\n")
 
-        while "\n" not in self._buffer:
-            chunk = self._socket.recv(4096).decode()
-            if not chunk:
-                raise ConnectionError("Bridge closed the connection")
-            self._buffer += chunk
+        # Consume progress heartbeats, return the final response
+        parsed = json.loads(self._recv_line())
+        while parsed.get("type") == "progress":
+            parsed = json.loads(self._recv_line())
 
-        line, self._buffer = self._buffer.split("\n", 1)
-        return json.loads(line)
+        return parsed
 
     def close(self) -> None:
         """Close the TCP connection."""

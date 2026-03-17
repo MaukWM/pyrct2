@@ -15,7 +15,7 @@ pyrct2 setup        # finds OpenRCT2, installs the bridge plugin
 
 ```python
 from pyrct2.client import RCT2
-from pyrct2._generated.enums import StaffType, AdvertisingCampaignType, ResearchFundingLevel
+from pyrct2.enums import StaffType, AdvertisingCampaignType, ResearchFundingLevel
 
 with RCT2.launch("/path/to/Scenarios/Crazy Castle.SC6") as game:
     # state queries return typed Pydantic models
