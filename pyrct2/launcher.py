@@ -9,6 +9,7 @@ from pathlib import Path
 
 from pyrct2.connection import Connection, DEFAULT_HOST, DEFAULT_PORT
 from pyrct2.paths import load_config
+from pyrct2.scenarios import SCENARIO_PACK, Scenario
 
 HEALTH_POLL_INTERVAL = 0.5
 LAUNCH_TIMEOUT = 30.0
@@ -58,7 +59,21 @@ class GameInstance:
         self.stop()
 
 
-def launch(park_file: str | Path, port: int = DEFAULT_PORT, headless: bool = True) -> GameInstance:
+def _resolve_scenario(scenario: Scenario) -> Path:
+    """Resolve a Scenario enum to a full path using the configured rct2_path."""
+    rct2_path = load_config()["rct2_path"]
+    park_path = Path(rct2_path) / "Scenarios" / scenario.value
+    if not park_path.exists():
+        pack = SCENARIO_PACK.get(scenario)
+        msg = f"Scenario '{scenario.name}' not found at {park_path}"
+        if pack:
+            msg += f"\nThis scenario requires the {pack} expansion pack."
+        raise FileNotFoundError(msg)
+
+    return park_path
+
+
+def launch(park_file: str | Path | Scenario, port: int = DEFAULT_PORT, headless: bool = True) -> GameInstance:
     """Launch OpenRCT2 and return a connected GameInstance.
 
     Blocks until the bridge plugin is ready (up to 30s).
@@ -69,9 +84,12 @@ def launch(park_file: str | Path, port: int = DEFAULT_PORT, headless: bool = Tru
     if not binary:
         raise RuntimeError("OpenRCT2 not configured. Run `pyrct2 setup` first.")
 
-    park_path = Path(park_file)
-    if not park_path.exists():
-        raise FileNotFoundError(f"Park file not found: {park_path}")
+    if isinstance(park_file, Scenario):
+        park_path = _resolve_scenario(park_file)
+    else:
+        park_path = Path(park_file)
+        if not park_path.exists():
+            raise FileNotFoundError(f"Park file not found: {park_path}")
 
     if _port_in_use(port):
         raise RuntimeError(f"Port {port} already in use. Is OpenRCT2 already running?")

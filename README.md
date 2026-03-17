@@ -15,9 +15,10 @@ pyrct2 setup        # finds OpenRCT2, installs the bridge plugin
 
 ```python
 from pyrct2.client import RCT2
+from pyrct2.scenarios import Scenario
 from pyrct2.enums import StaffType, AdvertisingCampaignType, ResearchFundingLevel
 
-with RCT2.launch("/path/to/Scenarios/Crazy Castle.SC6") as game:
+with RCT2.launch(Scenario.CRAZY_CASTLE) as game:
     # state queries return typed Pydantic models
     park = game.state.park()
     print(f"{park.name}: rating {park.rating}, cash ${park.cash}")

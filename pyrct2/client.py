@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from pyrct2.cli import BRIDGE_VERSION
 from pyrct2.connection import Connection, DEFAULT_HOST, DEFAULT_PORT
 from pyrct2.launcher import GameInstance, launch
+from pyrct2.scenarios import Scenario
 from pyrct2._generated.actions import ActionsProxy
 from pyrct2._generated.actions import GENERATED_API_VERSION as _ACTIONS_API_VERSION
 from pyrct2._generated.state import StateProxy
@@ -44,7 +45,11 @@ class RCT2:
 
     @classmethod
     def launch(
-        cls, park_file: str | Path, port: int = DEFAULT_PORT, start_paused: bool = True, headless: bool = True
+        cls,
+        park_file: str | Path | Scenario,
+        port: int = DEFAULT_PORT,
+        start_paused: bool = True,
+        headless: bool = True,
     ) -> RCT2:
         """Launch OpenRCT2 and return a connected client.
 
