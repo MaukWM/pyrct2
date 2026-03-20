@@ -2,6 +2,7 @@
 
 import atexit
 import re
+import socket
 import subprocess
 import threading
 import time
@@ -160,7 +161,7 @@ def _wait_for_bridge(port: int, process: subprocess.Popen) -> Connection:
             if result.get("success"):
                 return conn
             conn.close()
-        except (ConnectionRefusedError, TimeoutError, OSError):
+        except (ConnectionRefusedError, socket.timeout, OSError):
             pass
 
         time.sleep(HEALTH_POLL_INTERVAL)
