@@ -1,10 +1,10 @@
-"""TCP connection to openrct2-bridge (NDJSON protocol on port 9090)."""
+"""TCP connection to openrct2-bridge (NDJSON protocol)."""
 
 import json
 import socket
 
 DEFAULT_HOST = "127.0.0.1"
-DEFAULT_PORT = 9090
+DEFAULT_PORT = 20020
 DEFAULT_TIMEOUT = 10.0
 
 
@@ -17,6 +17,8 @@ class Connection:
         port: int = DEFAULT_PORT,
         timeout: float = DEFAULT_TIMEOUT,
     ):
+        self.host = host
+        self.port = port
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._socket.settimeout(timeout)
         self._socket.connect((host, port))

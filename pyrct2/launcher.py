@@ -1,27 +1,33 @@
 """Launch OpenRCT2 and wait for plugin readiness."""
 
 import atexit
-import socket
+import re
 import subprocess
 import threading
 import time
 from pathlib import Path
 
-from pyrct2.connection import Connection, DEFAULT_HOST, DEFAULT_PORT
+from pyrct2.connection import Connection
 from pyrct2.paths import load_config
 from pyrct2.scenarios import SCENARIO_PACK, Scenario
 
 HEALTH_POLL_INTERVAL = 0.5
 LAUNCH_TIMEOUT = 30.0
+PORT_PATTERN = re.compile(r"\[openrct2-bridge\] TCP server listening on port (\d+)")
 
 
 class GameInstance:
     """A running OpenRCT2 process with an active bridge connection."""
 
-    def __init__(self, process: subprocess.Popen, connection: Connection):
+    def __init__(
+        self,
+        process: subprocess.Popen,
+        connection: Connection,
+        logs: list[str],
+    ):
         self._process = process
         self.connection = connection
-        self.logs: list[str] = []
+        self.logs = logs
         self._log_thread = threading.Thread(target=self._capture_logs, daemon=True)
         self._log_thread.start()
         atexit.register(self._cleanup)
@@ -73,11 +79,11 @@ def _resolve_scenario(scenario: Scenario) -> Path:
     return park_path
 
 
-def launch(park_file: str | Path | Scenario, port: int = DEFAULT_PORT, headless: bool = True) -> GameInstance:
+def launch(park_file: str | Path | Scenario, headless: bool = True) -> GameInstance:
     """Launch OpenRCT2 and return a connected GameInstance.
 
-    Blocks until the bridge plugin is ready (up to 30s).
-    Set headless=False to launch with the game window visible.
+    The bridge plugin discovers its own port. This function reads the
+    bound port from stdout, then connects. Blocks up to 30s.
     """
     config = load_config()
     binary = config.get("openrct2_path")
@@ -91,9 +97,6 @@ def launch(park_file: str | Path | Scenario, port: int = DEFAULT_PORT, headless:
         if not park_path.exists():
             raise FileNotFoundError(f"Park file not found: {park_path}")
 
-    if _port_in_use(port):
-        raise RuntimeError(f"Port {port} already in use. Is OpenRCT2 already running?")
-
     cmd = [binary, "host", str(park_path)]
     if headless:
         cmd.append("--headless")
@@ -102,11 +105,14 @@ def launch(park_file: str | Path | Scenario, port: int = DEFAULT_PORT, headless:
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
+        bufsize=1,
         text=True,
     )
 
+    logs: list[str] = []
+    port = _read_port_from_stdout(process, logs)
     connection = _wait_for_bridge(port, process)
-    return GameInstance(process, connection)
+    return GameInstance(process, connection, logs)
 
 
 def _check_process(process: subprocess.Popen) -> None:
@@ -115,20 +121,34 @@ def _check_process(process: subprocess.Popen) -> None:
         raise RuntimeError(f"OpenRCT2 exited unexpectedly (exit code {process.returncode})")
 
 
-def _port_in_use(port: int, host: str = DEFAULT_HOST) -> bool:
-    """Check if something is already listening on the given port."""
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.settimeout(1)
-    try:
-        s.connect((host, port))
-        s.close()
-        return True
-    except (ConnectionRefusedError, socket.timeout):
-        return False
+def _read_port_from_stdout(process: subprocess.Popen, logs: list[str]) -> int:
+    """Read stdout lines until the bridge reports its bound port."""
+    deadline = time.monotonic() + LAUNCH_TIMEOUT
+
+    for line in process.stdout:  # type: ignore[union-attr]
+        line = line.rstrip("\n")
+        logs.append(line)
+
+        match = PORT_PATTERN.search(line)
+        if match:
+            return int(match.group(1))
+
+        if time.monotonic() > deadline:
+            break
+
+        _check_process(process)
+
+    process.terminate()
+    last_lines = "\n".join(logs[-10:])
+    raise TimeoutError(
+        f"Bridge did not report port within {LAUNCH_TIMEOUT}s. "
+        f"Expected log line matching: [openrct2-bridge] TCP server listening on port <N>\n"
+        f"Last output:\n{last_lines}"
+    )
 
 
 def _wait_for_bridge(port: int, process: subprocess.Popen) -> Connection:
-    """Poll the health endpoint until the bridge responds or timeout."""
+    """Connect and health-check."""
     deadline = time.monotonic() + LAUNCH_TIMEOUT
 
     while time.monotonic() < deadline:
@@ -140,10 +160,10 @@ def _wait_for_bridge(port: int, process: subprocess.Popen) -> Connection:
             if result.get("success"):
                 return conn
             conn.close()
-        except (ConnectionRefusedError, socket.timeout, OSError):
+        except (ConnectionRefusedError, TimeoutError, OSError):
             pass
 
         time.sleep(HEALTH_POLL_INTERVAL)
 
     process.terminate()
-    raise TimeoutError(f"Bridge did not respond within {LAUNCH_TIMEOUT}s")
+    raise TimeoutError(f"Bridge bound port {port} but health check failed within {LAUNCH_TIMEOUT}s")
