@@ -26,33 +26,40 @@ class StaffEntity:
     def __repr__(self) -> str:
         return f"StaffEntity({self.data.staffType} #{self.data.id} {self.data.name!r})"
 
+    @property
+    def _id(self) -> int:
+        """Entity ID — always present for spawned entities."""
+        if self.data.id is None:
+            raise ValueError("Entity has no ID")
+        return self.data.id
+
     # -- Write methods --
 
     def fire(self) -> ActionResult:
-        return ActionResult.from_response(self._client.actions.staff_fire(id=self.data.id))
+        return ActionResult.from_response(self._client.actions.staff_fire(id=self._id))
 
     def rename(self, name: str) -> ActionResult:
-        return ActionResult.from_response(self._client.actions.staff_set_name(id=self.data.id, name=name))
+        return ActionResult.from_response(self._client.actions.staff_set_name(id=self._id, name=name))
 
     def set_orders(self, orders: int) -> ActionResult:
         # TODO: orders is a bitmask — generate StaffOrders flags enum from C++ source
-        return ActionResult.from_response(self._client.actions.staff_set_orders(id=self.data.id, staff_orders=orders))
+        return ActionResult.from_response(self._client.actions.staff_set_orders(id=self._id, staff_orders=orders))
 
     def set_costume(self, costume: int) -> ActionResult:
         # TODO: costume is an int index — StaffCostume is a string enum in .d.ts
         # ("none", "handyman", "panda", "tiger", etc.) but the action takes an int.
         # Need to map StaffCostume strings to int indices.
-        return ActionResult.from_response(self._client.actions.staff_set_costume(id=self.data.id, costume=costume))
+        return ActionResult.from_response(self._client.actions.staff_set_costume(id=self._id, costume=costume))
 
     def set_colour(self, colour: Colour) -> ActionResult:
         """Set uniform colour for ALL staff of this type (game limitation)."""
         return ActionResult.from_response(
-            self._client.actions.staff_set_colour(staff_type=StaffType(self.data.staffType), colour=colour)
+            self._client.actions.staff_set_colour(staff_type=StaffType[self.data.staffType.upper()], colour=colour)
         )
 
     def set_patrol(self, x1: int, y1: int, x2: int, y2: int, mode: StaffSetPatrolAreaMode) -> ActionResult:
         return ActionResult.from_response(
-            self._client.actions.staff_set_patrol_area(id=self.data.id, x1=x1, y1=y1, x2=x2, y2=y2, mode=mode)
+            self._client.actions.staff_set_patrol_area(id=self._id, x1=x1, y1=y1, x2=x2, y2=y2, mode=mode)
         )
 
 
