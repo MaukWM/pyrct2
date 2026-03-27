@@ -16,6 +16,7 @@ from pyrct2._generated.actions import ActionsProxy
 from pyrct2._generated.actions import GENERATED_API_VERSION as _ACTIONS_API_VERSION
 from pyrct2._generated.state import StateProxy
 from pyrct2._generated.state import GENERATED_API_VERSION as _STATE_API_VERSION
+from pyrct2.park import ParkProxy
 
 if _ACTIONS_API_VERSION != _STATE_API_VERSION:
     raise RuntimeError(
@@ -36,12 +37,14 @@ class RCT2:
 
     actions: ActionsProxy
     state: StateProxy
+    park: ParkProxy
 
     def __init__(self, connection: Connection, instance: GameInstance | None = None):
         self._connection = connection
         self._instance = instance
         self.actions = ActionsProxy(self)
         self.state = StateProxy(self)
+        self.park = ParkProxy(self)
 
     @classmethod
     def launch(
