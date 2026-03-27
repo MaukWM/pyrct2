@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from pyrct2.cli import BRIDGE_VERSION
 from pyrct2.connection import Connection, DEFAULT_HOST, DEFAULT_PORT
+from pyrct2.errors import ActionError
 from pyrct2.launcher import GameInstance, launch
 from pyrct2.scenarios import Scenario
 from pyrct2._generated.actions import ActionsProxy
@@ -80,12 +81,25 @@ class RCT2:
         return client
 
     def execute(self, endpoint: str, params: dict | BaseModel | None = None) -> dict:
-        """Send a command to the bridge and return the response."""
+        """Send a command to the bridge and return the response.
+
+        Raises ActionError if the game rejects the action.
+        """
         if self._instance is not None:
             self._instance.check_alive()
         if isinstance(params, BaseModel):
             params = params.model_dump(by_alias=True)
-        return self._connection.send(endpoint, params)
+        resp = self._connection.send(endpoint, params)
+        if resp.get("error") == "game_error":
+            raise ActionError(
+                status=resp["status"],
+                title=resp.get("title"),
+                message=resp.get("message"),
+                cost=resp.get("cost"),
+                action=endpoint,
+                params=params,
+            )
+        return resp
 
     def get_status(self) -> dict:
         """Get current game status (paused state, date, ticks)."""
