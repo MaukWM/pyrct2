@@ -5,5 +5,6 @@ from pyrct2.park._climate import ClimateProxy
 from pyrct2.park._finance import FinanceProxy
 from pyrct2.park._park import ParkProxy
 from pyrct2.park._research import ResearchProxy
+from pyrct2.park._staff import StaffEntity, StaffProxy
 
-__all__ = ["CheatsProxy", "ClimateProxy", "FinanceProxy", "ParkProxy", "ResearchProxy"]
+__all__ = ["CheatsProxy", "ClimateProxy", "FinanceProxy", "ParkProxy", "ResearchProxy", "StaffEntity", "StaffProxy"]

@@ -10,6 +10,7 @@ from pyrct2.park._cheats import CheatsProxy
 from pyrct2.park._climate import ClimateProxy
 from pyrct2.park._finance import FinanceProxy
 from pyrct2.park._research import ResearchProxy
+from pyrct2.park._staff import StaffProxy
 from pyrct2.result import ActionResult
 
 if TYPE_CHECKING:
@@ -23,6 +24,7 @@ class ParkProxy:
     climate: ClimateProxy
     finance: FinanceProxy
     research: ResearchProxy
+    staff: StaffProxy
 
     def __init__(self, client: RCT2) -> None:
         self._client = client
@@ -30,6 +32,7 @@ class ParkProxy:
         self.climate = ClimateProxy(client)
         self.finance = FinanceProxy(client)
         self.research = ResearchProxy(client)
+        self.staff = StaffProxy(client)
 
     # -- Read properties
 
