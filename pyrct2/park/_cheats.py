@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pyrct2._generated.enums import CheatType
+from pyrct2._generated.enums import CheatType, ShopItem
 from pyrct2._generated.state import Cheats
 from pyrct2.result import ActionResult
 
@@ -27,6 +27,9 @@ class CheatsProxy:
 
     def _fire(self, cheat: CheatType) -> ActionResult:
         return ActionResult.from_response(self._client.actions.cheat_set(type=cheat, param1=0, param2=0))
+
+    def _set(self, cheat: CheatType, value: int) -> ActionResult:
+        return ActionResult.from_response(self._client.actions.cheat_set(type=cheat, param1=value, param2=0))
 
     def list(self) -> Cheats:
         """Return all cheat flags as a Pydantic model."""
@@ -155,3 +158,36 @@ class CheatsProxy:
 
     def open_close_park(self) -> ActionResult:
         return self._fire(CheatType.OPEN_CLOSE_PARK)
+
+    def remove_park_fences(self) -> ActionResult:
+        return self._fire(CheatType.REMOVE_PARK_FENCES)
+
+    # -- Value cheats --
+
+    def set_forced_park_rating(self, rating: int) -> ActionResult:
+        """Set forced park rating (0-999). Use -1 to disable."""
+        return self._set(CheatType.SET_FORCED_PARK_RATING, rating)
+
+    def set_money(self, amount: int) -> ActionResult:
+        return self._set(CheatType.SET_MONEY, amount)
+
+    def add_money(self, amount: int) -> ActionResult:
+        return self._set(CheatType.ADD_MONEY, amount)
+
+    def clear_loan(self) -> ActionResult:
+        return self._fire(CheatType.CLEAR_LOAN)
+
+    def force_weather(self, weather_type: int) -> ActionResult:  # TODO: generate WeatherType enum
+        return self._set(CheatType.FORCE_WEATHER, weather_type)
+
+    def generate_guests(self, count: int) -> ActionResult:
+        return self._set(CheatType.GENERATE_GUESTS, count)
+
+    def set_grass_length(self, length: int) -> ActionResult:  # TODO: generate GrassLength enum
+        return self._set(CheatType.SET_GRASS_LENGTH, length)
+
+    def set_staff_speed(self, speed: int) -> ActionResult:  # TODO: generate StaffSpeed enum
+        return self._set(CheatType.SET_STAFF_SPEED, speed)
+
+    def give_all_guests(self, item: ShopItem) -> ActionResult:  # TODO: only BALLOON/TOY/MAP/PHOTO (0-3) are valid
+        return self._set(CheatType.GIVE_ALL_GUESTS, item)
