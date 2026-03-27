@@ -57,7 +57,11 @@ class ParkProxy:
         return ActionResult.from_response(self._client.actions.park_set_name(name=name))
 
     def open(self) -> ActionResult:
-        return ActionResult.from_response(self._client.actions.park_set_parameter(parameter=ParkParameter.OPEN, value=1))
+        return ActionResult.from_response(
+            self._client.actions.park_set_parameter(parameter=ParkParameter.OPEN, value=1)
+        )
 
     def close(self) -> ActionResult:
-        return ActionResult.from_response(self._client.actions.park_set_parameter(parameter=ParkParameter.CLOSE, value=0))
+        return ActionResult.from_response(
+            self._client.actions.park_set_parameter(parameter=ParkParameter.CLOSE, value=0)
+        )

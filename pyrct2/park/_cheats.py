@@ -25,6 +25,9 @@ class CheatsProxy:
     def _toggle(self, cheat: CheatType, active: bool) -> ActionResult:
         return ActionResult.from_response(self._client.actions.cheat_set(type=cheat, param1=int(active), param2=0))
 
+    def _fire(self, cheat: CheatType) -> ActionResult:
+        return ActionResult.from_response(self._client.actions.cheat_set(type=cheat, param1=0, param2=0))
+
     def list(self) -> Cheats:
         """Return all cheat flags as a Pydantic model."""
         return self._client.state.cheats()
@@ -108,3 +111,47 @@ class CheatsProxy:
 
     def ignore_ride_price(self, active: bool = True) -> ActionResult:
         return self._toggle(CheatType.IGNORE_PRICE, active)
+
+    # -- One-shot actions --
+
+    def remove_all_guests(self) -> ActionResult:
+        return self._fire(CheatType.REMOVE_ALL_GUESTS)
+
+    def water_plants(self) -> ActionResult:
+        return self._fire(CheatType.WATER_PLANTS)
+
+    def fix_vandalism(self) -> ActionResult:
+        return self._fire(CheatType.FIX_VANDALISM)
+
+    def remove_litter(self) -> ActionResult:
+        return self._fire(CheatType.REMOVE_LITTER)
+
+    def renew_rides(self) -> ActionResult:
+        return self._fire(CheatType.RENEW_RIDES)
+
+    def fix_rides(self) -> ActionResult:
+        return self._fire(CheatType.FIX_RIDES)
+
+    def reset_crash_status(self) -> ActionResult:
+        return self._fire(CheatType.RESET_CRASH_STATUS)
+
+    def ten_minute_inspections(self) -> ActionResult:
+        return self._fire(CheatType.TEN_MINUTE_INSPECTIONS)
+
+    def win_scenario(self) -> ActionResult:
+        return self._fire(CheatType.WIN_SCENARIO)
+
+    def have_fun(self) -> ActionResult:
+        return self._fire(CheatType.HAVE_FUN)
+
+    def own_all_land(self) -> ActionResult:
+        return self._fire(CheatType.OWN_ALL_LAND)
+
+    def create_ducks(self) -> ActionResult:
+        return self._fire(CheatType.CREATE_DUCKS)
+
+    def remove_ducks(self) -> ActionResult:
+        return self._fire(CheatType.REMOVE_DUCKS)
+
+    def open_close_park(self) -> ActionResult:
+        return self._fire(CheatType.OPEN_CLOSE_PARK)

@@ -38,3 +38,18 @@ def test_boolean_cheat_toggle(game, method):
     getattr(game.park.cheats, method)(active=False)
     restored = game.park.cheats.list().model_dump()
     assert restored == before, f"{method}(active=False) did not restore state"
+
+
+# One-shot methods have signature (self) only — no parameters.
+ONE_SHOT_CHEATS = [
+    name
+    for name, method in inspect.getmembers(CheatsProxy, predicate=inspect.isfunction)
+    if not name.startswith("_")
+    and name != "list"
+    and list(inspect.signature(method).parameters.keys()) == ["self"]
+]
+
+
+@pytest.mark.parametrize("method", ONE_SHOT_CHEATS)
+def test_one_shot_cheat(game, method):
+    getattr(game.park.cheats, method)()
