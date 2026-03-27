@@ -9,7 +9,7 @@ import pytest
 
 from pyrct2.park._cheats import CheatsProxy
 
-# Boolean toggle methods all have signature (self, enabled: bool = True).
+# Boolean toggle methods all have signature (self, active: bool = True).
 # Discover them by inspecting parameters — future value/one-shot methods
 # will have different signatures and won't match.
 BOOLEAN_CHEATS = [
@@ -17,7 +17,7 @@ BOOLEAN_CHEATS = [
     for name, method in inspect.getmembers(CheatsProxy, predicate=inspect.isfunction)
     if not name.startswith("_")
     and name != "list"
-    and list(inspect.signature(method).parameters.keys()) == ["self", "enabled"]
+    and list(inspect.signature(method).parameters.keys()) == ["self", "active"]
 ]
 
 
@@ -35,6 +35,6 @@ def test_boolean_cheat_toggle(game, method):
     after = game.park.cheats.list().model_dump()
     assert before != after, f"{method}() had no effect"
 
-    getattr(game.park.cheats, method)(enabled=False)
+    getattr(game.park.cheats, method)(active=False)
     restored = game.park.cheats.list().model_dump()
-    assert restored == before, f"{method}(enabled=False) did not restore state"
+    assert restored == before, f"{method}(active=False) did not restore state"

@@ -14,15 +14,15 @@ if TYPE_CHECKING:
 class CheatsProxy:
     """High-level cheats namespace: ``game.park.cheats``.
 
-    Every boolean cheat has a dedicated method with an ``enabled`` parameter
+    Every boolean cheat has a dedicated method with an ``active`` parameter
     (default True).
     """
 
     def __init__(self, client: RCT2) -> None:
         self._client = client
 
-    def _toggle(self, cheat: CheatType, enabled: bool) -> dict:
-        return self._client.actions.cheat_set(type=cheat, param1=int(enabled), param2=0)
+    def _toggle(self, cheat: CheatType, active: bool) -> dict:
+        return self._client.actions.cheat_set(type=cheat, param1=int(active), param2=0)
 
     def list(self) -> Cheats:
         """Return all cheat flags as a Pydantic model."""
@@ -30,80 +30,80 @@ class CheatsProxy:
 
     # -- Boolean toggles --
 
-    def sandbox_mode(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.SANDBOX_MODE, enabled)
+    def sandbox_mode(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.SANDBOX_MODE, active)
 
-    def disable_clearance_checks(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.DISABLE_CLEARANCE_CHECKS, enabled)
+    def disable_clearance_checks(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.DISABLE_CLEARANCE_CHECKS, active)
 
-    def disable_support_limits(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.DISABLE_SUPPORT_LIMITS, enabled)
+    def disable_support_limits(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.DISABLE_SUPPORT_LIMITS, active)
 
-    def show_all_operating_modes(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.SHOW_ALL_OPERATING_MODES, enabled)
+    def show_all_operating_modes(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.SHOW_ALL_OPERATING_MODES, active)
 
-    def show_vehicles_from_other_track_types(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.SHOW_VEHICLES_FROM_OTHER_TRACK_TYPES, enabled)
+    def show_vehicles_from_other_track_types(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.SHOW_VEHICLES_FROM_OTHER_TRACK_TYPES, active)
 
-    def disable_train_length_limit(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.DISABLE_TRAIN_LENGTH_LIMIT, enabled)
+    def disable_train_length_limit(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.DISABLE_TRAIN_LENGTH_LIMIT, active)
 
-    def enable_chain_lift_on_all_track(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.ENABLE_CHAIN_LIFT_ON_ALL_TRACK, enabled)
+    def enable_chain_lift_on_all_track(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.ENABLE_CHAIN_LIFT_ON_ALL_TRACK, active)
 
-    def fast_lift_hill(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.FAST_LIFT_HILL, enabled)
+    def fast_lift_hill(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.FAST_LIFT_HILL, active)
 
-    def disable_brakes_failure(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.DISABLE_BRAKES_FAILURE, enabled)
+    def disable_brakes_failure(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.DISABLE_BRAKES_FAILURE, active)
 
-    def disable_all_breakdowns(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.DISABLE_ALL_BREAKDOWNS, enabled)
+    def disable_all_breakdowns(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.DISABLE_ALL_BREAKDOWNS, active)
 
-    def build_in_pause_mode(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.BUILD_IN_PAUSE_MODE, enabled)
+    def build_in_pause_mode(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.BUILD_IN_PAUSE_MODE, active)
 
-    def ignore_ride_intensity(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.IGNORE_RIDE_INTENSITY, enabled)
+    def ignore_ride_intensity(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.IGNORE_RIDE_INTENSITY, active)
 
-    def disable_vandalism(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.DISABLE_VANDALISM, enabled)
+    def disable_vandalism(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.DISABLE_VANDALISM, active)
 
-    def disable_littering(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.DISABLE_LITTERING, enabled)
+    def disable_littering(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.DISABLE_LITTERING, active)
 
-    def disable_plant_aging(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.DISABLE_PLANT_AGING, enabled)
+    def disable_plant_aging(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.DISABLE_PLANT_AGING, active)
 
-    def make_destructible(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.MAKE_DESTRUCTIBLE, enabled)
+    def make_destructible(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.MAKE_DESTRUCTIBLE, active)
 
-    def freeze_weather(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.FREEZE_WEATHER, enabled)
+    def freeze_weather(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.FREEZE_WEATHER, active)
 
-    def neverending_marketing(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.NEVERENDING_MARKETING, enabled)
+    def neverending_marketing(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.NEVERENDING_MARKETING, active)
 
-    def allow_arbitrary_ride_type_changes(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.ALLOW_ARBITRARY_RIDE_TYPE_CHANGES, enabled)
+    def allow_arbitrary_ride_type_changes(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.ALLOW_ARBITRARY_RIDE_TYPE_CHANGES, active)
 
-    def disable_ride_value_aging(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.DISABLE_RIDE_VALUE_AGING, enabled)
+    def disable_ride_value_aging(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.DISABLE_RIDE_VALUE_AGING, active)
 
-    def ignore_research_status(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.IGNORE_RESEARCH_STATUS, enabled)
+    def ignore_research_status(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.IGNORE_RESEARCH_STATUS, active)
 
-    def enable_all_drawable_track_pieces(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.ENABLE_ALL_DRAWABLE_TRACK_PIECES, enabled)
+    def enable_all_drawable_track_pieces(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.ENABLE_ALL_DRAWABLE_TRACK_PIECES, active)
 
-    def allow_track_place_invalid_heights(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.ALLOW_TRACK_PLACE_INVALID_HEIGHTS, enabled)
+    def allow_track_place_invalid_heights(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.ALLOW_TRACK_PLACE_INVALID_HEIGHTS, active)
 
-    def allow_regular_path_as_queue(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.ALLOW_REGULAR_PATH_AS_QUEUE, enabled)
+    def allow_regular_path_as_queue(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.ALLOW_REGULAR_PATH_AS_QUEUE, active)
 
-    def allow_special_colour_schemes(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.ALLOW_SPECIAL_COLOUR_SCHEMES, enabled)
+    def allow_special_colour_schemes(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.ALLOW_SPECIAL_COLOUR_SCHEMES, active)
 
-    def ignore_ride_price(self, enabled: bool = True) -> dict:
-        return self._toggle(CheatType.IGNORE_PRICE, enabled)
+    def ignore_ride_price(self, active: bool = True) -> dict:
+        return self._toggle(CheatType.IGNORE_PRICE, active)
