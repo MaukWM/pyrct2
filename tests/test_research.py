@@ -1,22 +1,23 @@
 """Integration tests for game.park.research high-level API.
 
-Fixture state: funding=2 (NORMAL), all 7 priority categories enabled,
-stage='initial_research', progress=0, 16 invented, 9 uninvented.
+Fixture state: funding=NORMAL, all 7 priority categories enabled,
+stage=INITIAL_RESEARCH, progress=0, 16 invented, 9 uninvented.
 """
+
+from pyrct2._generated.enums import ResearchFundingLevel
+from pyrct2.park._research import ResearchCategory, ResearchStage
 
 
 def test_funding(game):
-    assert game.park.research.funding == 2
+    assert game.park.research.funding == ResearchFundingLevel.NORMAL
 
 
 def test_priorities(game):
-    assert game.park.research.priorities == [
-        "transport", "gentle", "rollercoaster", "thrill", "water", "shop", "scenery"
-    ]
+    assert game.park.research.priorities == list(ResearchCategory)
 
 
 def test_stage(game):
-    assert game.park.research.stage == "initial_research"
+    assert game.park.research.stage == ResearchStage.INITIAL_RESEARCH
 
 
 def test_progress(game):

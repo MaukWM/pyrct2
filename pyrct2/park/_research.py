@@ -2,12 +2,43 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
+from pyrct2._generated.enums import ResearchFundingLevel
 from pyrct2._generated.state import ResearchItem
 
 if TYPE_CHECKING:
     from pyrct2.client import RCT2
+
+
+class ResearchStage(StrEnum):
+    """Research funding stages from the OpenRCT2 plugin API.
+
+    Hand-copied from openrct2.d.ts ResearchFundingStage type definition.
+    """
+
+    INITIAL_RESEARCH = "initial_research"
+    DESIGNING = "designing"
+    COMPLETING_DESIGN = "completing_design"
+    UNKNOWN = "unknown"
+    FINISHED_ALL = "finished_all"
+
+
+class ResearchCategory(StrEnum):
+    """Research priority categories from the OpenRCT2 plugin API.
+
+    Hand-copied from openrct2.d.ts ResearchCategory type definition.
+    Each category corresponds to a bit in the priorities bitmask (bit 0 = transport, ..., bit 6 = scenery).
+    """
+
+    TRANSPORT = "transport"
+    GENTLE = "gentle"
+    ROLLERCOASTER = "rollercoaster"
+    THRILL = "thrill"
+    WATER = "water"
+    SHOP = "shop"
+    SCENERY = "scenery"
 
 
 class ResearchProxy:
@@ -37,16 +68,16 @@ class ResearchProxy:
         return self._client.state.park_research().progress
 
     @property
-    def funding(self) -> int:
-        return self._client.state.park_research().funding
+    def funding(self) -> ResearchFundingLevel:
+        return ResearchFundingLevel(self._client.state.park_research().funding)
 
     @property
-    def priorities(self) -> list[str]:
-        return self._client.state.park_research().priorities
+    def priorities(self) -> list[ResearchCategory]:
+        return [ResearchCategory(p) for p in self._client.state.park_research().priorities]
 
     @property
-    def stage(self) -> str:
-        return self._client.state.park_research().stage
+    def stage(self) -> ResearchStage:
+        return ResearchStage(self._client.state.park_research().stage)
 
     # TODO: set_funding(ResearchFundingLevel) — needs bitmask conversion for priorities
     # TODO: set_priorities(...) — needs bitmask conversion + enum for categories
