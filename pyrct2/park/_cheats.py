@@ -115,6 +115,13 @@ class CheatsProxy:
     def ignore_ride_price(self, active: bool = True) -> ActionResult:
         return self._toggle(CheatType.IGNORE_PRICE, active)
 
+    # Park flag cheats — state stored in park.flags, not cheats namespace
+    def no_money(self, active: bool = True) -> ActionResult:
+        return self._toggle(CheatType.NO_MONEY, active)
+
+    # NOTE: UNLOCK_ALL_PRICES (10) rejected by game with INVALID_PARAMETERS on v0.4.32.
+    # May be deprecated or handled differently. Available via raw actions if needed.
+
     # -- One-shot actions --
 
     def remove_all_guests(self) -> ActionResult:
@@ -197,3 +204,12 @@ class CheatsProxy:
         # 0=MONEY, 1=PARK_MAP, 2=BALLOON, 3=UMBRELLA
         # TODO: generate GuestGiftObject enum from Cheats.h
         return self._set(CheatType.GIVE_ALL_GUESTS, item)
+
+    def set_guest_parameter(self, parameter: int, value: int) -> ActionResult:
+        # GUEST_PARAMETER_* enum (0-7) from src/openrct2/Cheats.h:
+        # 0=happiness, 1=energy, 2=hunger, 3=thirst, 4=nausea,
+        # 5=nausea_tolerance, 6=toilet, 7=preferred_ride_intensity
+        # TODO: generate GuestParameter enum from Cheats.h
+        return ActionResult.from_response(
+            self._client.actions.cheat_set(type=CheatType.SET_GUEST_PARAMETER, param1=parameter, param2=value)
+        )

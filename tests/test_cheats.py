@@ -12,11 +12,14 @@ from pyrct2.park._cheats import CheatsProxy
 # Boolean toggle methods all have signature (self, active: bool = True).
 # Discover them by inspecting parameters — future value/one-shot methods
 # will have different signatures and won't match.
+# Excludes park-flag cheats whose state lives in park.flags, not cheats namespace.
+PARK_FLAG_CHEATS = {"no_money"}
 BOOLEAN_CHEATS = [
     name
     for name, method in inspect.getmembers(CheatsProxy, predicate=inspect.isfunction)
     if not name.startswith("_")
     and name != "list"
+    and name not in PARK_FLAG_CHEATS
     and list(inspect.signature(method).parameters.keys()) == ["self", "active"]
 ]
 
@@ -51,6 +54,16 @@ ONE_SHOT_CHEATS = [
 @pytest.mark.parametrize("method", ONE_SHOT_CHEATS)
 def test_one_shot_cheat(game, method):
     getattr(game.park.cheats, method)()
+
+
+# -- Park flag cheats (state in park.flags, not cheats namespace) --
+
+
+def test_no_money(game):
+    game.park.cheats.no_money()
+    assert game.state.park_flags().noMoney is True
+    game.park.cheats.no_money(active=False)
+    assert game.state.park_flags().noMoney is False
 
 
 # -- Value cheats --
@@ -97,3 +110,7 @@ def test_set_staff_speed(game):
 
 def test_give_all_guests(game):
     game.park.cheats.give_all_guests(2)  # BALLOON (OBJECT_* enum: 0=money, 1=map, 2=balloon, 3=umbrella)
+
+
+def test_set_guest_parameter(game):
+    game.park.cheats.set_guest_parameter(0, 255)  # happiness=255
