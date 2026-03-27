@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from pyrct2._generated.enums import ParkParameter
 from pyrct2._generated.state import GameDate, ScenarioObjective
+from pyrct2.park._finance import FinanceProxy
 
 if TYPE_CHECKING:
     from pyrct2.client import RCT2
@@ -14,8 +15,11 @@ if TYPE_CHECKING:
 class ParkProxy:
     """High-level park namespace: ``game.park``."""
 
+    finance: FinanceProxy
+
     def __init__(self, client: RCT2) -> None:
         self._client = client
+        self.finance = FinanceProxy(client)
 
     # -- Read properties
 
