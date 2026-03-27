@@ -44,5 +44,5 @@ with RCT2.connect() as game:
 
 ## Requirements
 
-- Python 3.13+
+- Python 3.11+
 - [OpenRCT2](https://openrct2.io/) installed with RCT2 game data
