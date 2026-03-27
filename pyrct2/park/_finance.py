@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pyrct2.result import ActionResult
+
 if TYPE_CHECKING:
     from pyrct2.client import RCT2
 
@@ -34,16 +36,14 @@ class FinanceProxy:
 
     # -- Write methods --
 
-    def set_entrance_fee(self, amount: int) -> dict:
-        return self._client.actions.park_set_entrance_fee(value=amount)
+    def set_entrance_fee(self, amount: int) -> ActionResult:
+        return ActionResult.from_response(self._client.actions.park_set_entrance_fee(value=amount))
 
-    def set_loan(self, amount: int) -> dict:
-        return self._client.actions.park_set_loan(value=amount)
+    def set_loan(self, amount: int) -> ActionResult:
+        return ActionResult.from_response(self._client.actions.park_set_loan(value=amount))
 
-    def take_loan(self, amount: int) -> dict:
-        new_loan = self.loan + amount
-        return self._client.actions.park_set_loan(value=new_loan)
+    def take_loan(self, amount: int) -> ActionResult:
+        return ActionResult.from_response(self._client.actions.park_set_loan(value=self.loan + amount))
 
-    def repay_loan(self, amount: int) -> dict:
-        new_loan = self.loan - amount
-        return self._client.actions.park_set_loan(value=new_loan)
+    def repay_loan(self, amount: int) -> ActionResult:
+        return ActionResult.from_response(self._client.actions.park_set_loan(value=self.loan - amount))

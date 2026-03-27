@@ -8,6 +8,7 @@ from pyrct2._generated.enums import ParkParameter
 from pyrct2._generated.state import GameDate, ScenarioObjective
 from pyrct2.park._cheats import CheatsProxy
 from pyrct2.park._finance import FinanceProxy
+from pyrct2.result import ActionResult
 
 if TYPE_CHECKING:
     from pyrct2.client import RCT2
@@ -52,17 +53,11 @@ class ParkProxy:
 
     # -- Write methods --
 
-    def set_name(self, name: str) -> dict:
-        return self._client.actions.park_set_name(name=name)
+    def set_name(self, name: str) -> ActionResult:
+        return ActionResult.from_response(self._client.actions.park_set_name(name=name))
 
-    def open(self) -> dict:
-        return self._client.actions.park_set_parameter(
-            parameter=ParkParameter.OPEN,
-            value=1,
-        )
+    def open(self) -> ActionResult:
+        return ActionResult.from_response(self._client.actions.park_set_parameter(parameter=ParkParameter.OPEN, value=1))
 
-    def close(self) -> dict:
-        return self._client.actions.park_set_parameter(
-            parameter=ParkParameter.CLOSE,
-            value=0,
-        )
+    def close(self) -> ActionResult:
+        return ActionResult.from_response(self._client.actions.park_set_parameter(parameter=ParkParameter.CLOSE, value=0))
