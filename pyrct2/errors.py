@@ -9,6 +9,12 @@ class ActionStatus(IntEnum):
     """OpenRCT2 GameActions::Status codes returned when an action is rejected.
 
     Hand-copied from OpenRCT2 C++ source (not auto-generated).
+
+    Last value addition (NOT_CLOSED, BROKEN) was Feb 2019:
+    https://github.com/OpenRCT2/OpenRCT2/commit/c1546a92b7be8d29e214c19975f8bbb8bd47c91f
+    Only cosmetic renames since then — last change was casing convention (Dec 2025):
+    https://github.com/OpenRCT2/OpenRCT2/commit/5ffee91
+
     Source: https://github.com/OpenRCT2/OpenRCT2/blob/develop/src/openrct2/actions/GameActionResult.h
     """
 

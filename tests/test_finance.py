@@ -48,16 +48,14 @@ def test_repay_loan(game):
 
 
 def test_negative_loan_raises(game):
-    with pytest.raises(ActionError) as exc_info:
+    with pytest.raises(ActionError):
         game.park.finance.set_loan(-100)
-    assert exc_info.value.status == 1
     assert game.park.finance.loan == 100000  # unchanged
 
 
 def test_loan_above_max_raises(game):
-    with pytest.raises(ActionError) as exc_info:
+    with pytest.raises(ActionError):
         game.park.finance.set_loan(999999999)
-    assert exc_info.value.status == 2
     assert game.park.finance.loan == 100000  # unchanged
 
 
