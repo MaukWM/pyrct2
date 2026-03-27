@@ -38,3 +38,41 @@ def test_expected_item(game):
 
 def test_last_researched_item(game):
     assert game.park.research.last_researched_item is None
+
+
+# -- Write methods --
+
+
+def test_set_funding(game):
+    game.park.research.set_funding(ResearchFundingLevel.MAXIMUM)
+    assert game.park.research.funding == ResearchFundingLevel.MAXIMUM
+    # Verify priorities weren't wiped
+    assert game.park.research.priorities == list(ResearchCategory)
+
+
+def test_set_priorities(game):
+    subset = [ResearchCategory.ROLLERCOASTER, ResearchCategory.THRILL]
+    game.park.research.set_priorities(subset)
+    assert game.park.research.priorities == subset
+    # Verify funding wasn't changed
+    assert game.park.research.funding == ResearchFundingLevel.NORMAL
+
+
+def test_disable_priority(game):
+    game.park.research.disable_priority(ResearchCategory.SCENERY)
+    priorities = game.park.research.priorities
+    assert ResearchCategory.SCENERY not in priorities
+    assert len(priorities) == 6
+
+
+def test_enable_priority(game):
+    game.park.research.set_priorities([])
+    assert game.park.research.priorities == []
+
+    game.park.research.enable_priority(ResearchCategory.THRILL)
+    assert game.park.research.priorities == [ResearchCategory.THRILL]
+
+    game.park.research.enable_priority(ResearchCategory.WATER)
+    assert ResearchCategory.THRILL in game.park.research.priorities
+    assert ResearchCategory.WATER in game.park.research.priorities
+    assert len(game.park.research.priorities) == 2
