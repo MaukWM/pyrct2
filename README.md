@@ -16,27 +16,30 @@ pyrct2 setup        # finds OpenRCT2, installs the bridge plugin
 ```python
 from pyrct2.client import RCT2
 from pyrct2.scenarios import Scenario
-from pyrct2.enums import StaffType, AdvertisingCampaignType, ResearchFundingLevel
+from pyrct2.enums import ResearchFundingLevel, ResearchCategory
 
 with RCT2.launch(Scenario.CRAZY_CASTLE) as game:
-    # state queries return typed Pydantic models
-    park = game.state.park()
-    print(f"{park.name}: rating {park.rating}, cash ${park.cash}")
+    # high-level API — read properties, call methods
+    print(f"{game.park.name}: rating {game.park.rating}, cash ${game.park.finance.cash}")
 
-    # actions take typed enums — no magic ints
-    game.actions.staff_hire_new(auto_position=True, staff_type=StaffType.MECHANIC, costume_index=0, staff_orders=0)
-    game.actions.park_marketing(type=AdvertisingCampaignType.PARK_ENTRY_FREE, item=0, duration=4)
-    game.actions.park_set_research_funding(priorities=0xFF, funding_amount=ResearchFundingLevel.MAXIMUM)
+    game.park.finance.set_entrance_fee(50)
+    game.park.cheats.sandbox_mode()
+    game.park.research.set_funding(ResearchFundingLevel.MAXIMUM)
+    game.park.research.set_priorities([ResearchCategory.ROLLERCOASTER, ResearchCategory.THRILL])
 
     # tick-step the simulation forward
     game.advance_ticks(100)
-    print(f"Rating: {game.state.park_rating()}")
+    print(f"Weather: {game.park.climate.weather}")
+
+    # raw API always available as escape hatch
+    game.actions.staff_hire_new(auto_position=True, staff_type=0, costume_index=0, staff_orders=0)
+    park = game.state.park()  # full Pydantic model
 ```
 
 ```python
 # or attach to an already-running instance
 with RCT2.connect() as game:
-    print(game.state.scenario_name())
+    print(game.park.name)
 ```
 
 ## Requirements
