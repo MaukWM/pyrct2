@@ -96,6 +96,4 @@ def test_set_staff_speed(game):
 
 
 def test_give_all_guests(game):
-    from pyrct2._generated.enums import ShopItem
-
-    game.park.cheats.give_all_guests(ShopItem.BALLOON)  # TODO: Shop items are not correct for this?
+    game.park.cheats.give_all_guests(2)  # BALLOON (OBJECT_* enum: 0=money, 1=map, 2=balloon, 3=umbrella)

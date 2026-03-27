@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pyrct2._generated.enums import CheatType, ShopItem
+from pyrct2._generated.enums import CheatType
 from pyrct2._generated.state import Cheats
 from pyrct2.result import ActionResult
 
@@ -177,17 +177,23 @@ class CheatsProxy:
     def clear_loan(self) -> ActionResult:
         return self._fire(CheatType.CLEAR_LOAN)
 
-    def force_weather(self, weather_type: int) -> ActionResult:  # TODO: generate WeatherType enum
+    def force_weather(self, weather_type: int) -> ActionResult:
+        # TODO: generate WeatherType enum (0-8) from src/openrct2/world/Weather.h
         return self._set(CheatType.FORCE_WEATHER, weather_type)
 
     def generate_guests(self, count: int) -> ActionResult:
         return self._set(CheatType.GENERATE_GUESTS, count)
 
-    def set_grass_length(self, length: int) -> ActionResult:  # TODO: generate GrassLength enum
+    def set_grass_length(self, length: int) -> ActionResult:
+        # TODO: generate GrassLength enum (0-6) from src/openrct2/world/tile_element/SurfaceElement.h
         return self._set(CheatType.SET_GRASS_LENGTH, length)
 
-    def set_staff_speed(self, speed: int) -> ActionResult:  # TODO: generate StaffSpeed enum
+    def set_staff_speed(self, speed: int) -> ActionResult:
+        # TODO: Valid values: 0=frozen, 96=normal, 255=fast (raw uint8, see src/openrct2/Cheats.h), generate or make an enum?
         return self._set(CheatType.SET_STAFF_SPEED, speed)
 
-    def give_all_guests(self, item: ShopItem) -> ActionResult:  # TODO: only BALLOON/TOY/MAP/PHOTO (0-3) are valid
+    def give_all_guests(self, item: int) -> ActionResult:
+        # Not ShopItem — uses anonymous OBJECT_* enum from src/openrct2/Cheats.h:
+        # 0=MONEY, 1=PARK_MAP, 2=BALLOON, 3=UMBRELLA
+        # TODO: generate GuestGiftObject enum from Cheats.h
         return self._set(CheatType.GIVE_ALL_GUESTS, item)
