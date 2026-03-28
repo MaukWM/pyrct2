@@ -2,10 +2,7 @@
 
 Fixture state: empty park, no staff.
 """
-
-import pytest
-
-from pyrct2._generated.enums import StaffType
+from pyrct2._generated.enums import Colour, StaffType
 
 STAFF_TYPES = [StaffType.HANDYMAN, StaffType.MECHANIC, StaffType.SECURITY, StaffType.ENTERTAINER]
 
@@ -14,10 +11,13 @@ def test_list_empty(game):
     assert game.park.staff.list() == []
 
 
-@pytest.mark.parametrize("staff_type", STAFF_TYPES, ids=[t.name for t in STAFF_TYPES])
-def test_hire(game, staff_type):
-    staff = game.park.staff.hire(staff_type)
-    assert staff.data.staffType == staff_type.name.lower()
+def test_hire_all_types(game):
+    for staff_type in STAFF_TYPES:
+        game.park.staff.hire(staff_type)
+    staff = game.park.staff.list()
+    assert len(staff) == 4
+    types = {s.data.staffType for s in staff}
+    assert types == {"handyman", "mechanic", "security", "entertainer"}
 
 
 def test_get(game):
@@ -37,3 +37,10 @@ def test_fire(game):
     entity_id = staff.data.id
     staff.fire()
     assert game.park.staff.get(entity_id) is None
+
+
+def test_set_colour(game):
+    staff = game.park.staff.hire(StaffType.HANDYMAN)
+    staff.set_colour(Colour.BRIGHT_RED)
+    refreshed = game.park.staff.get(staff.data.id)
+    assert refreshed.data.colour == Colour.BRIGHT_RED
