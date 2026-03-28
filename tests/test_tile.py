@@ -1,6 +1,6 @@
 """Unit tests for Tile coordinate type — no game instance needed."""
 
-from pyrct2.world import TILE_SIZE, Tile
+from pyrct2.world import Tile
 
 
 def test_to_world():

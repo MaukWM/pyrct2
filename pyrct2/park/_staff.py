@@ -13,6 +13,12 @@ if TYPE_CHECKING:
     from pyrct2.client import RCT2
 
 
+def _validate_rect(start: Tile, end: Tile) -> None:
+    """Raise ValueError if start is not northwest of end."""
+    if start.x > end.x or start.y > end.y:
+        raise ValueError(f"start {start} must be <= end {end} (northwest to southeast)")
+
+
 class StaffEntity:
     """Wrapper around a Staff snapshot that adds action methods.
 
@@ -77,6 +83,7 @@ class StaffEntity:
 
     def add_patrol_area(self, start: Tile, end: Tile) -> ActionResult:
         """Add a rectangle of tiles to the patrol area (additive)."""
+        _validate_rect(start, end)
         wx1, wy1 = start.to_world()
         wx2, wy2 = end.to_world()
         return ActionResult.from_response(
@@ -92,6 +99,7 @@ class StaffEntity:
 
     def remove_patrol_area(self, start: Tile, end: Tile) -> ActionResult:
         """Remove a rectangle of tiles from the patrol area."""
+        _validate_rect(start, end)
         wx1, wy1 = start.to_world()
         wx2, wy2 = end.to_world()
         return ActionResult.from_response(
