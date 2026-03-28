@@ -28,7 +28,12 @@ class StaffEntity:
 
     @property
     def _id(self) -> int:
-        """Entity ID — always present for spawned entities."""
+        """Entity ID — always present for live entities from list()/hire().
+
+        The API declares id as int|None because stale JS references to
+        removed entities return null. We only hold live entity snapshots.
+        See: https://github.com/OpenRCT2/OpenRCT2/blob/develop/src/openrct2/scripting/bindings/entity/ScEntity.hpp
+        """
         if self.data.id is None:
             raise ValueError("Entity has no ID")
         return self.data.id
