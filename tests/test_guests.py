@@ -3,8 +3,6 @@
 Uses test_scenario_with_guests fixture (12 guests, 10x10 map).
 """
 
-from pyrct2.world import Tile
-
 
 def test_list(game_with_guests):
     guests = game_with_guests.park.guests.list()
