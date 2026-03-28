@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from pyrct2._generated.enums import Colour, StaffSetPatrolAreaMode, StaffType
 from pyrct2._generated.state import Staff
 from pyrct2.result import ActionResult
+from pyrct2.world import Tile
 
 if TYPE_CHECKING:
     from pyrct2.client import RCT2
@@ -38,6 +39,13 @@ class StaffEntity:
             raise ValueError("Entity has no ID")
         return self.data.id
 
+    # -- Read helpers --
+
+    @property
+    def tile(self) -> Tile:
+        """Tile this staff member is standing on (floored from world coords)."""
+        return Tile.from_world(self.data.x, self.data.y)
+
     # -- Write methods --
 
     def fire(self) -> ActionResult:
@@ -62,10 +70,58 @@ class StaffEntity:
             self._client.actions.staff_set_colour(staff_type=StaffType[self.data.staffType.upper()], colour=colour)
         )
 
-    def set_patrol(self, x1: int, y1: int, x2: int, y2: int, mode: StaffSetPatrolAreaMode) -> ActionResult:
+    def set_patrol_area(self, start: Tile, end: Tile) -> ActionResult:
+        """Set patrol area to a rectangle, replacing any existing area."""
+        self.clear_patrol_area()
+        return self.add_patrol_area(start, end)
+
+    def add_patrol_area(self, start: Tile, end: Tile) -> ActionResult:
+        """Add a rectangle of tiles to the patrol area (additive)."""
+        wx1, wy1 = start.to_world()
+        wx2, wy2 = end.to_world()
         return ActionResult.from_response(
-            self._client.actions.staff_set_patrol_area(id=self._id, x1=x1, y1=y1, x2=x2, y2=y2, mode=mode)
+            self._client.actions.staff_set_patrol_area(
+                id=self._id,
+                x1=wx1,
+                y1=wy1,
+                x2=wx2,
+                y2=wy2,
+                mode=StaffSetPatrolAreaMode.SET,
+            )
         )
+
+    def remove_patrol_area(self, start: Tile, end: Tile) -> ActionResult:
+        """Remove a rectangle of tiles from the patrol area."""
+        wx1, wy1 = start.to_world()
+        wx2, wy2 = end.to_world()
+        return ActionResult.from_response(
+            self._client.actions.staff_set_patrol_area(
+                id=self._id,
+                x1=wx1,
+                y1=wy1,
+                x2=wx2,
+                y2=wy2,
+                mode=StaffSetPatrolAreaMode.UNSET,
+            )
+        )
+
+    def clear_patrol_area(self) -> ActionResult:
+        """Clear the entire patrol area."""
+        return ActionResult.from_response(
+            self._client.actions.staff_set_patrol_area(
+                id=self._id,
+                x1=0,
+                y1=0,
+                x2=0,
+                y2=0,
+                mode=StaffSetPatrolAreaMode.CLEAR_ALL,
+            )
+        )
+
+    @property
+    def patrol_tiles(self) -> list[Tile]:
+        """Current patrol area as a list of tiles."""
+        return [Tile.from_world(c.x, c.y) for c in self.data.patrolArea.tiles]
 
 
 class StaffProxy:

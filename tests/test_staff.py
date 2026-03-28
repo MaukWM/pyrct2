@@ -2,7 +2,9 @@
 
 Fixture state: empty park, no staff.
 """
+
 from pyrct2._generated.enums import Colour, StaffType
+from pyrct2.world import Tile
 
 STAFF_TYPES = [StaffType.HANDYMAN, StaffType.MECHANIC, StaffType.SECURITY, StaffType.ENTERTAINER]
 
@@ -44,3 +46,48 @@ def test_set_colour(game):
     staff.set_colour(Colour.BRIGHT_RED)
     refreshed = game.park.staff.get(staff.data.id)
     assert refreshed.data.colour == Colour.BRIGHT_RED
+
+
+def test_set_patrol_area(game):
+    """set_patrol replaces the entire patrol area."""
+    staff = game.park.staff.hire(StaffType.HANDYMAN)
+    staff.set_patrol_area(Tile(x=5, y=5), Tile(x=6, y=6))
+    refreshed = game.park.staff.get(staff.data.id)
+    assert len(refreshed.patrol_tiles) == 4
+
+    # set_patrol replaces — should be 9, not 13
+    refreshed.set_patrol_area(Tile(x=10, y=10), Tile(x=12, y=12))
+    refreshed2 = game.park.staff.get(staff.data.id)
+    assert len(refreshed2.patrol_tiles) == 9
+
+
+def test_add_patrol_area(game):
+    """add_patrol is additive."""
+    staff = game.park.staff.hire(StaffType.HANDYMAN)
+    staff.add_patrol_area(Tile(x=5, y=5), Tile(x=6, y=6))
+    staff.add_patrol_area(Tile(x=10, y=10), Tile(x=11, y=11))
+    refreshed = game.park.staff.get(staff.data.id)
+    assert len(refreshed.patrol_tiles) == 8  # 4 + 4
+
+
+def test_remove_patrol_area(game):
+    """remove_patrol removes tiles from the area."""
+    staff = game.park.staff.hire(StaffType.HANDYMAN)
+    staff.set_patrol_area(Tile(x=5, y=5), Tile(x=8, y=8))
+    refreshed = game.park.staff.get(staff.data.id)
+    assert len(refreshed.patrol_tiles) == 16
+
+    refreshed.remove_patrol_area(Tile(x=7, y=7), Tile(x=8, y=8))
+    refreshed2 = game.park.staff.get(staff.data.id)
+    assert len(refreshed2.patrol_tiles) == 12
+
+
+def test_clear_patrol_area(game):
+    staff = game.park.staff.hire(StaffType.HANDYMAN)
+    staff.set_patrol_area(Tile(x=5, y=5), Tile(x=8, y=8))
+    refreshed = game.park.staff.get(staff.data.id)
+    assert len(refreshed.patrol_tiles) == 16
+
+    refreshed.clear_patrol_area()
+    refreshed2 = game.park.staff.get(staff.data.id)
+    assert refreshed2.patrol_tiles == []
