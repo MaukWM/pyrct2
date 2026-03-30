@@ -20,6 +20,7 @@ TILE_SIZE: int = 32
 class Tile(BaseModel):
     """A tile coordinate on the game grid.
 
+    Supports both ``Tile(3, 7)`` and ``Tile(x=3, y=7)``.
     Frozen (immutable + hashable) so it can be used as a dict key or in sets.
     """
 
@@ -27,6 +28,12 @@ class Tile(BaseModel):
 
     x: int
     y: int
+
+    def __init__(self, *args: int, **kwargs: int) -> None:
+        if args:
+            super().__init__(x=args[0], y=args[1] if len(args) > 1 else 0, **kwargs)
+        else:
+            super().__init__(**kwargs)
 
     def to_world(self) -> tuple[int, int]:
         """World coords at tile origin (northwest corner)."""
