@@ -12,7 +12,7 @@ from pyrct2.paths import (
     validate_openrct2_binary,
 )
 
-BRIDGE_VERSION = "v1.2.0"
+BRIDGE_VERSION = "v1.3.0"
 BRIDGE_FILENAME = "openrct2-bridge.js"
 BRIDGE_DOWNLOAD_URL = f"https://github.com/MaukWM/openrct2-bridge/releases/download/{BRIDGE_VERSION}/{BRIDGE_FILENAME}"
 
