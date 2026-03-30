@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, TypeAdapter
 
+from pyrct2._generated.state import TileElement
 from pyrct2.world._tile import Tile
 
 if TYPE_CHECKING:
     from pyrct2.client import RCT2
+
+_tile_element_adapter: TypeAdapter[TileElement] = TypeAdapter(TileElement)
 
 
 class MapBounds(BaseModel):
@@ -17,8 +20,16 @@ class MapBounds(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    width: int
-    height: int
+    x: int
+    y: int
+
+
+class TileData(BaseModel):
+    """A tile's full element stack as returned by the bridge."""
+
+    x: int
+    y: int
+    elements: list[TileElement]
 
 
 class WorldProxy:
@@ -30,23 +41,23 @@ class WorldProxy:
     def get_bounds(self) -> MapBounds:
         """Map dimensions in tiles."""
         raw = self._client._query("get_map_size")
-        return MapBounds(width=raw["x"], height=raw["y"])
+        return MapBounds(x=raw["x"], y=raw["y"])
 
-    def get_tile(self, tile: Tile) -> dict[str, Any]:
-        """Fetch raw tile data (surface + all stacked elements).
+    def get_tile(self, tile: Tile) -> TileData:
+        """Fetch a tile's full element stack."""
+        raw = self._client._query("get_tile", {"x": tile.x, "y": tile.y})
+        return TileData(
+            x=raw["x"],
+            y=raw["y"],
+            elements=[_tile_element_adapter.validate_python(e) for e in raw["elements"]],
+        )
 
-        Returns the bridge payload as-is: {x, y, elements: [...]}.
-        A typed TileData model will wrap this in a future version.
-        """
-        return self._client._query("get_tile", {"x": tile.x, "y": tile.y})
-
-    def get_tiles(self, from_tile: Tile, to_tile: Tile) -> list[dict[str, Any]]:
+    def get_tiles(self, from_tile: Tile, to_tile: Tile) -> list[TileData]:
         """Fetch all tiles in a rectangular region (inclusive).
 
-        Returns a list of raw tile payloads. Much faster than
-        individual get_tile() calls due to single TCP round-trip.
+        Much faster than individual get_tile() calls due to single TCP round-trip.
         """
-        return self._client._query(
+        raw_tiles = self._client._query(
             "get_tiles",
             {
                 "x1": from_tile.x,
@@ -55,3 +66,11 @@ class WorldProxy:
                 "y2": to_tile.y,
             },
         )
+        return [
+            TileData(
+                x=t["x"],
+                y=t["y"],
+                elements=[_tile_element_adapter.validate_python(e) for e in t["elements"]],
+            )
+            for t in raw_tiles
+        ]
