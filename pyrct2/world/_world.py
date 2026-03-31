@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, TypeAdapter
 
+from pyrct2._generated.enums import MapSelectType
 from pyrct2._generated.state import (
     BannerElement,
     EntranceElement,
@@ -17,8 +18,9 @@ from pyrct2._generated.state import (
     TrackElement,
     WallElement,
 )
+from pyrct2.result import ActionResult
 from pyrct2.world._slope import CornerHeights, decode_slope
-from pyrct2.world._tile import Tile
+from pyrct2.world._tile import TILE_SIZE, Tile
 
 if TYPE_CHECKING:
     from pyrct2.client import RCT2
@@ -133,3 +135,143 @@ class WorldProxy:
             h for t in tiles for h in (t.corner_heights.n, t.corner_heights.e, t.corner_heights.s, t.corner_heights.w)
         }
         return len(heights) == 1
+
+    # ── Terraform ─────────────────────────────────────────────────────
+
+    def set_height(self, tile: Tile, height: int, slope: int = 0) -> ActionResult:
+        """Set a tile to an exact height (land steps) and slope.
+
+        Args:
+            tile: The tile to modify.
+            height: Target height in land steps (not z-units).
+            slope: Slope bitmask (0=flat, 1=N, 2=E, 4=S, 8=W, 16=diagonal).
+        """
+        # The action takes baseHeight units (2 per land step).
+        base_height = height * 2
+        return ActionResult.from_response(
+            self._client.actions.land_set_height(
+                x=tile.x * TILE_SIZE,
+                y=tile.y * TILE_SIZE,
+                height=base_height,
+                style=slope,
+            )
+        )
+
+    def raise_land(
+        self,
+        from_tile: Tile,
+        to_tile: Tile | None = None,
+        selection_type: MapSelectType = MapSelectType.FULL,
+    ) -> ActionResult:
+        """Raise terrain by one land step. No neighbor smoothing.
+
+        Each tile in the area is raised independently — this can create
+        sharp cliffs at the edges. Use raise_land_smooth() for game-UI-like
+        behavior with automatic slope transitions.
+
+        Valid selection_types: FULL, CORNER0-3 (N/E/S/W), EDGE0-3 (SW/NW/NE/SE).
+        """
+        to_tile = to_tile or from_tile
+        x1 = min(from_tile.x, to_tile.x) * TILE_SIZE
+        y1 = min(from_tile.y, to_tile.y) * TILE_SIZE
+        x2 = max(from_tile.x, to_tile.x) * TILE_SIZE
+        y2 = max(from_tile.y, to_tile.y) * TILE_SIZE
+        return ActionResult.from_response(
+            self._client.actions.land_raise(
+                x=x1,
+                y=y1,
+                x1=x1,
+                y1=y1,
+                x2=x2,
+                y2=y2,
+                selection_type=selection_type,
+            )
+        )
+
+    def lower_land(
+        self,
+        from_tile: Tile,
+        to_tile: Tile | None = None,
+        selection_type: MapSelectType = MapSelectType.FULL,
+    ) -> ActionResult:
+        """Lower terrain by one land step. No neighbor smoothing.
+
+        See raise_land() for details. Use lower_land_smooth() for
+        game-UI-like behavior.
+        """
+        to_tile = to_tile or from_tile
+        x1 = min(from_tile.x, to_tile.x) * TILE_SIZE
+        y1 = min(from_tile.y, to_tile.y) * TILE_SIZE
+        x2 = max(from_tile.x, to_tile.x) * TILE_SIZE
+        y2 = max(from_tile.y, to_tile.y) * TILE_SIZE
+        return ActionResult.from_response(
+            self._client.actions.land_lower(
+                x=x1,
+                y=y1,
+                x1=x1,
+                y1=y1,
+                x2=x2,
+                y2=y2,
+                selection_type=selection_type,
+            )
+        )
+
+    def raise_land_smooth(
+        self,
+        from_tile: Tile,
+        to_tile: Tile | None = None,
+        selection_type: MapSelectType = MapSelectType.FULL,
+    ) -> ActionResult:
+        """Raise terrain by one land step with neighbor smoothing.
+
+        Behaves like the in-game raise tool: raises the area and
+        automatically creates slope transitions on neighboring tiles
+        to avoid cliffs.
+
+        Valid selection_types: FULL, CORNER0-3 (N/E/S/W), EDGE0-3 (SW/NW/NE/SE).
+        """
+        to_tile = to_tile or from_tile
+        x1 = min(from_tile.x, to_tile.x) * TILE_SIZE
+        y1 = min(from_tile.y, to_tile.y) * TILE_SIZE
+        x2 = max(from_tile.x, to_tile.x) * TILE_SIZE
+        y2 = max(from_tile.y, to_tile.y) * TILE_SIZE
+        return ActionResult.from_response(
+            self._client.actions.land_smooth(
+                x=x1,
+                y=y1,
+                x1=x1,
+                y1=y1,
+                x2=x2,
+                y2=y2,
+                selection_type=selection_type,
+                is_lowering=False,
+            )
+        )
+
+    def lower_land_smooth(
+        self,
+        from_tile: Tile,
+        to_tile: Tile | None = None,
+        selection_type: MapSelectType = MapSelectType.FULL,
+    ) -> ActionResult:
+        """Lower terrain by one land step with neighbor smoothing.
+
+        See raise_land_smooth() for details.
+        """
+        to_tile = to_tile or from_tile
+        x1 = min(from_tile.x, to_tile.x) * TILE_SIZE
+        y1 = min(from_tile.y, to_tile.y) * TILE_SIZE
+        x2 = max(from_tile.x, to_tile.x) * TILE_SIZE
+        y2 = max(from_tile.y, to_tile.y) * TILE_SIZE
+        return ActionResult.from_response(
+            self._client.actions.land_smooth(
+                x=x1,
+                y=y1,
+                x1=x1,
+                y1=y1,
+                x2=x2,
+                y2=y2,
+                selection_type=selection_type,
+                is_lowering=True,
+            )
+        )
