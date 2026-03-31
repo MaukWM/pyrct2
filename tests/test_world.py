@@ -114,6 +114,82 @@ def test_is_area_flat(game):
     assert game.world.is_area_flat(Tile(x=25, y=25), Tile(x=27, y=27))
 
 
-# TODO: Once world.terraform() exists, add tests that:
-# 1. Check flat area → terraform a slope → verify is_area_flat returns False
-# 2. Check max_corner_height → terraform higher → verify it increases
+# ── Terraform ─────────────────────────────────────────────────────────
+
+
+def test_set_height(game):
+    """Set exact height in land steps."""
+    game.park.cheats.build_in_pause_mode()
+    game.world.set_height(Tile(x=20, y=20), height=10)
+    tile = game.world.get_tile(Tile(x=20, y=20))
+    assert tile.corner_heights.max == 10
+    assert tile.corner_heights.is_flat
+
+
+def test_set_height_with_slope(game):
+    """Set height with N corner raised."""
+    game.park.cheats.build_in_pause_mode()
+    game.world.set_height(Tile(x=20, y=20), height=10, slope=1)  # TODO: Enum/bitmask?
+    tile = game.world.get_tile(Tile(x=20, y=20))
+    assert not tile.corner_heights.is_flat
+    assert tile.corner_heights.n == 11
+    assert tile.corner_heights.s == 10
+
+
+def test_raise_land(game):
+    """Raise increases height by one land step."""
+    game.park.cheats.build_in_pause_mode()
+    before = game.world.get_tile(Tile(x=20, y=20)).corner_heights.max
+    game.world.raise_land(Tile(x=20, y=20))
+    after = game.world.get_tile(Tile(x=20, y=20)).corner_heights.max
+    assert after == before + 1
+
+
+def test_lower_land(game):
+    """Lower decreases height by one land step."""
+    game.park.cheats.build_in_pause_mode()
+    before = game.world.get_tile(Tile(x=20, y=20)).corner_heights.max
+    game.world.lower_land(Tile(x=20, y=20))
+    after = game.world.get_tile(Tile(x=20, y=20)).corner_heights.max
+    assert after == before - 1
+
+
+def test_is_area_flat_after_raise(game):
+    """Flat area → raise one tile → no longer flat."""
+    game.park.cheats.build_in_pause_mode()
+    area = (Tile(x=20, y=20), Tile(x=22, y=22))
+    assert game.world.is_area_flat(*area)
+    game.world.raise_land(Tile(x=21, y=21))
+    assert not game.world.is_area_flat(*area)
+
+
+def test_max_corner_height_after_raise(game):
+    """Max height increases after raising part of the area."""
+    game.park.cheats.build_in_pause_mode()
+    area = (Tile(x=20, y=20), Tile(x=22, y=22))
+    before = game.world.max_corner_height(*area)
+    game.world.raise_land(Tile(x=21, y=21))
+    after = game.world.max_corner_height(*area)
+    assert after == before + 1
+
+
+def test_raise_land_smooth_affects_neighbors(game):
+    """Smooth raise creates slopes on surrounding tiles."""
+    game.park.cheats.build_in_pause_mode()
+    center = Tile(x=30, y=30)
+
+    # Verify area is flat before
+    assert game.world.is_area_flat(Tile(x=29, y=29), Tile(x=31, y=31))
+
+    game.world.raise_land_smooth(center)
+
+    # Center should be raised
+    assert game.world.get_tile(center).corner_heights.max > game.world.get_tile(Tile(x=25, y=25)).corner_heights.max
+
+    # At least some neighbors should now be sloped (not flat)
+    neighbors_sloped = 0
+    for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+        tile = game.world.get_tile(Tile(x=30 + dx, y=30 + dy))
+        if not tile.corner_heights.is_flat:
+            neighbors_sloped += 1
+    assert neighbors_sloped > 0, "Smooth raise should create slopes on neighbors"
