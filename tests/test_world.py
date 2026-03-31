@@ -67,6 +67,12 @@ def test_get_tile_empty_lists(game):
     assert tile.banners == []
 
 
+def test_corner_heights_flat(game):
+    """Flat tile has equal corner heights."""
+    tile = game.world.get_tile(Tile(x=26, y=26))
+    assert tile.corner_heights.is_flat
+
+
 # ── get_tiles (batch) ─────────────────────────────────────────────────
 
 

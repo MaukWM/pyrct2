@@ -17,6 +17,7 @@ from pyrct2._generated.state import (
     TrackElement,
     WallElement,
 )
+from pyrct2.world._slope import CornerHeights, decode_slope
 from pyrct2.world._tile import Tile
 
 if TYPE_CHECKING:
@@ -47,6 +48,11 @@ class TileData(BaseModel):
         surfaces = [e for e in self.elements if isinstance(e, SurfaceElement)]
         assert len(surfaces) == 1, f"Expected 1 surface element at ({self.x}, {self.y}), found {len(surfaces)}"
         return surfaces[0]
+
+    @property
+    def corner_heights(self) -> CornerHeights:
+        """Height at each corner in land steps, accounting for slope."""
+        return decode_slope(self.surface.baseZ, self.surface.slope)
 
     @property
     def paths(self) -> list[FootpathElement]:
