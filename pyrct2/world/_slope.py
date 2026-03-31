@@ -40,6 +40,15 @@ from pydantic import BaseModel, ConfigDict
 # https://github.com/OpenRCT2/OpenRCT2/blob/v0.4.32/src/openrct2/world/MapLimits.h#L32
 LAND_HEIGHT_STEP: int = 16
 
+# Slope bitmask constants for use with set_height(slope=...).
+# https://github.com/OpenRCT2/OpenRCT2/blob/v0.4.32/src/openrct2/world/tile_element/Slope.h#L18-L24
+SLOPE_FLAT: int = 0
+SLOPE_N: int = 1
+SLOPE_E: int = 2
+SLOPE_S: int = 4
+SLOPE_W: int = 8
+SLOPE_DIAGONAL: int = 16
+
 
 class CornerHeights(BaseModel):
     """Height at each corner of a tile, in land steps (not raw z-units).

@@ -5,7 +5,7 @@ Tests run against both fixture parks:
 - test_scenario_with_guests.park: 12x12, has footpaths and park entrance
 """
 
-from pyrct2.world import Tile, TileData
+from pyrct2.world import SLOPE_N, Tile, TileData
 
 
 # ── get_bounds ────────────────────────────────────────────────────────
@@ -129,7 +129,7 @@ def test_set_height(game):
 def test_set_height_with_slope(game):
     """Set height with N corner raised."""
     game.park.cheats.build_in_pause_mode()
-    game.world.set_height(Tile(x=20, y=20), height=10, slope=1)  # TODO: Enum/bitmask?
+    game.world.set_height(Tile(x=20, y=20), height=10, slope=SLOPE_N)
     tile = game.world.get_tile(Tile(x=20, y=20))
     assert not tile.corner_heights.is_flat
     assert tile.corner_heights.n == 11

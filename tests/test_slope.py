@@ -2,7 +2,7 @@
 
 import pytest
 
-from pyrct2.world import Tile, decode_slope
+from pyrct2.world import SLOPE_N, Tile, decode_slope
 from pyrct2.world._slope import LAND_HEIGHT_STEP
 
 # Arbitrary base height for unit tests.
@@ -44,13 +44,9 @@ def test_decode_flat_tile(game):
 def test_decode_sloped_tile(game):
     """Set a slope via terraform and verify decode matches."""
     game.park.cheats.build_in_pause_mode()
-    base = game.world.get_tile(Tile(x=26, y=26)).surface.baseHeight
+    base = game.world.get_tile(Tile(x=20, y=20)).corner_heights.max
 
-    # TODO: Replace with world.terraform() when available. Currently uses raw
-    # action with world coords (tile * 32). style is the slope bitmask from
-    # Slope.h: 1=N, 2=E, 4=S, 8=W corner up. No enum available yet.
-    STYLE_N_CORNER_UP = 1
-    game.actions.land_set_height(x=20 * 32, y=20 * 32, height=base, style=STYLE_N_CORNER_UP)
+    game.world.set_height(Tile(x=20, y=20), height=base, slope=SLOPE_N)
     tile = game.world.get_tile(Tile(x=20, y=20))
 
     h = decode_slope(tile.surface.baseZ, tile.surface.slope)
