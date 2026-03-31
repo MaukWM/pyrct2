@@ -1,6 +1,16 @@
 """Spatial abstraction layer — tile coordinates and world queries."""
 
+from pyrct2.world._slope import LAND_HEIGHT_STEP, CornerHeights, decode_slope
 from pyrct2.world._tile import TILE_SIZE, Tile
 from pyrct2.world._world import MapBounds, TileData, WorldProxy
 
-__all__ = ["TILE_SIZE", "Tile", "MapBounds", "TileData", "WorldProxy"]
+__all__ = [
+    "LAND_HEIGHT_STEP",
+    "CornerHeights",
+    "MapBounds",
+    "TILE_SIZE",
+    "Tile",
+    "TileData",
+    "WorldProxy",
+    "decode_slope",
+]
