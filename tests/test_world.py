@@ -97,3 +97,23 @@ def test_get_tiles_with_footpaths(game_with_guests):
     assert len(tiles) == 5
     for tile in tiles:
         assert len(tile.paths) == 1
+
+
+# ── Area queries ──────────────────────────────────────────────────────
+
+
+def test_max_corner_height(game):
+    """Flat area returns consistent max height."""
+    h = game.world.max_corner_height(Tile(x=25, y=25), Tile(x=27, y=27))
+    single = game.world.get_tile(Tile(x=26, y=26)).corner_heights.max
+    assert h == single
+
+
+def test_is_area_flat(game):
+    """Center of test park is flat."""
+    assert game.world.is_area_flat(Tile(x=25, y=25), Tile(x=27, y=27))
+
+
+# TODO: Once world.terraform() exists, add tests that:
+# 1. Check flat area → terraform a slope → verify is_area_flat returns False
+# 2. Check max_corner_height → terraform higher → verify it increases

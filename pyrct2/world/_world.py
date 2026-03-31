@@ -104,14 +104,13 @@ class WorldProxy:
 
         Much faster than individual get_tile() calls due to single TCP round-trip.
         """
+        x1 = min(from_tile.x, to_tile.x)
+        y1 = min(from_tile.y, to_tile.y)
+        x2 = max(from_tile.x, to_tile.x)
+        y2 = max(from_tile.y, to_tile.y)
         raw_tiles = self._client._query(
             "get_tiles",
-            {
-                "x1": from_tile.x,
-                "y1": from_tile.y,
-                "x2": to_tile.x,
-                "y2": to_tile.y,
-            },
+            {"x1": x1, "y1": y1, "x2": x2, "y2": y2},
         )
         return [
             TileData(
@@ -121,3 +120,16 @@ class WorldProxy:
             )
             for t in raw_tiles
         ]
+
+    def max_corner_height(self, from_tile: Tile, to_tile: Tile) -> int:
+        """Highest corner height (land steps) across a rectangular region."""
+        tiles = self.get_tiles(from_tile, to_tile)
+        return max(t.corner_heights.max for t in tiles)
+
+    def is_area_flat(self, from_tile: Tile, to_tile: Tile) -> bool:
+        """Whether all corners across a rectangular region are at the same height."""
+        tiles = self.get_tiles(from_tile, to_tile)
+        heights = {
+            h for t in tiles for h in (t.corner_heights.n, t.corner_heights.e, t.corner_heights.s, t.corner_heights.w)
+        }
+        return len(heights) == 1
