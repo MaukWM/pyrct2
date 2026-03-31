@@ -5,11 +5,6 @@ Tests run against both fixture parks:
 - test_scenario_with_guests.park: 12x12, has footpaths and park entrance
 """
 
-from pyrct2._generated.state import (
-    EntranceElement,
-    FootpathElement,
-    SurfaceElement,
-)
 from pyrct2.world import Tile, TileData
 
 
@@ -37,34 +32,39 @@ def test_get_tile_returns_tile_data(game):
     assert tile.y == 26
 
 
-def test_get_tile_has_surface(game):
-    """Every tile has at least a surface element."""
+def test_get_tile_surface(game):
+    """Every tile has a .surface property."""
     tile = game.world.get_tile(Tile(x=26, y=26))
-    surfaces = [e for e in tile.elements if isinstance(e, SurfaceElement)]
-    assert len(surfaces) == 1
-    surface = next(e for e in tile.elements if isinstance(e, SurfaceElement))
-    assert surface.hasOwnership is True
+    assert tile.surface.hasOwnership is True
 
 
 def test_get_tile_edge_unowned(game):
     """Edge tile (0,0) is not owned."""
     tile = game.world.get_tile(Tile(x=0, y=0))
-    surface = next(e for e in tile.elements if isinstance(e, SurfaceElement))
-    assert surface.hasOwnership is False
+    assert tile.surface.hasOwnership is False
 
 
 def test_get_tile_with_footpath(game_with_guests):
     """Tile (5,5) in guest park has a footpath."""
     tile = game_with_guests.world.get_tile(Tile(x=5, y=5))
-    paths = [e for e in tile.elements if isinstance(e, FootpathElement)]
-    assert len(paths) == 1
+    assert len(tile.paths) == 1
 
 
 def test_get_tile_with_entrance(game_with_guests):
     """Tile (9,5) in guest park has a park entrance."""
     tile = game_with_guests.world.get_tile(Tile(x=9, y=5))
-    entrances = [e for e in tile.elements if isinstance(e, EntranceElement)]
-    assert len(entrances) == 1
+    assert len(tile.entrances) == 1
+
+
+def test_get_tile_empty_lists(game):
+    """Surface-only tile has empty lists for other element types."""
+    tile = game.world.get_tile(Tile(x=26, y=26))
+    assert tile.paths == []
+    assert tile.tracks == []
+    assert tile.scenery == []
+    assert tile.walls == []
+    assert tile.entrances == []
+    assert tile.banners == []
 
 
 # ── get_tiles (batch) ─────────────────────────────────────────────────
@@ -90,5 +90,4 @@ def test_get_tiles_with_footpaths(game_with_guests):
     tiles = game_with_guests.world.get_tiles(Tile(x=4, y=5), Tile(x=8, y=5))
     assert len(tiles) == 5
     for tile in tiles:
-        paths = [e for e in tile.elements if isinstance(e, FootpathElement)]
-        assert len(paths) == 1
+        assert len(tile.paths) == 1

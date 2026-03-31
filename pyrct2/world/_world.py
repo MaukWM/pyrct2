@@ -6,7 +6,17 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, TypeAdapter
 
-from pyrct2._generated.state import TileElement
+from pyrct2._generated.state import (
+    BannerElement,
+    EntranceElement,
+    FootpathElement,
+    LargeSceneryElement,
+    SmallSceneryElement,
+    SurfaceElement,
+    TileElement,
+    TrackElement,
+    WallElement,
+)
 from pyrct2.world._tile import Tile
 
 if TYPE_CHECKING:
@@ -30,6 +40,37 @@ class TileData(BaseModel):
     x: int
     y: int
     elements: list[TileElement]
+
+    @property
+    def surface(self) -> SurfaceElement:
+        """The surface element (exactly one per tile)."""
+        surfaces = [e for e in self.elements if isinstance(e, SurfaceElement)]
+        assert len(surfaces) == 1, f"Expected 1 surface element at ({self.x}, {self.y}), found {len(surfaces)}"
+        return surfaces[0]
+
+    @property
+    def paths(self) -> list[FootpathElement]:
+        return [e for e in self.elements if isinstance(e, FootpathElement)]
+
+    @property
+    def tracks(self) -> list[TrackElement]:
+        return [e for e in self.elements if isinstance(e, TrackElement)]
+
+    @property
+    def scenery(self) -> list[SmallSceneryElement | LargeSceneryElement]:
+        return [e for e in self.elements if isinstance(e, (SmallSceneryElement, LargeSceneryElement))]
+
+    @property
+    def walls(self) -> list[WallElement]:
+        return [e for e in self.elements if isinstance(e, WallElement)]
+
+    @property
+    def entrances(self) -> list[EntranceElement]:
+        return [e for e in self.elements if isinstance(e, EntranceElement)]
+
+    @property
+    def banners(self) -> list[BannerElement]:
+        return [e for e in self.elements if isinstance(e, BannerElement)]
 
 
 class WorldProxy:
