@@ -22,7 +22,14 @@ if TYPE_CHECKING:
 
 
 class RidesProxy:
-    """Ride placement and management: ``game.rides``."""
+    """Ride placement and management: ``game.rides``.
+
+    # TODO: Add query methods: get(ride_id), list(), list_stalls() etc.
+    # Currently ride state is only accessible via game.state.rides() which
+    # returns raw Ride models with no category filtering. A higher-level
+    # API here would let developers do game.rides.get(ride_id).status,
+    # game.rides.list_stalls(), etc.
+    """
 
     def __init__(self, client: RCT2) -> None:
         self._client = client
