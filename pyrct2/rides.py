@@ -94,22 +94,34 @@ class RidesProxy:
 
         Raises:
             RuntimeError: If the ride object is not loaded in the scenario.
-            ValueError: If height is below the surface, entrance/exit overlaps
-                footprint, or no track type found.
+            ValueError: If height is below the surface, entrance/exit is inside
+                or not adjacent to the footprint, or no track type found.
             ActionError: If placement fails (terrain, clearance, ownership, etc.).
         """
         # Step 0: Validate entrance/exit against footprint
         footprint = _compute_footprint(obj, tile, direction)
         footprint_set = set(footprint)
+        adjacent = _adjacent_tiles(footprint_set)
+
         if entrance in footprint_set:
             raise ValueError(
                 f"Entrance {entrance} is inside the ride footprint. "
                 f"Place it on a tile adjacent to the footprint edge, not on top of it."
             )
+        if entrance not in adjacent:
+            raise ValueError(
+                f"Entrance {entrance} is not adjacent to the ride footprint. "
+                f"Place it on a tile directly next to (not diagonal to) the footprint edge."
+            )
         if exit in footprint_set:
             raise ValueError(
                 f"Exit {exit} is inside the ride footprint. "
                 f"Place it on a tile adjacent to the footprint edge, not on top of it."
+            )
+        if exit not in adjacent:
+            raise ValueError(
+                f"Exit {exit} is not adjacent to the ride footprint. "
+                f"Place it on a tile directly next to (not diagonal to) the footprint edge."
             )
         ride_id, ride_type = self._create_ride(obj, tile, height, direction)
 
@@ -246,6 +258,17 @@ class RidesProxy:
 
 
 # ── Helpers ───────────────────────────────────────────────────────────
+
+
+def _adjacent_tiles(footprint: set[Tile]) -> set[Tile]:
+    """Return tiles cardinally adjacent to the footprint but not inside it."""
+    adjacent = set()
+    for t in footprint:
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            neighbor = Tile(t.x + dx, t.y + dy)
+            if neighbor not in footprint:
+                adjacent.add(neighbor)
+    return adjacent
 
 
 def _resolve_height(client: RCT2, tile: Tile, height: int | None) -> int:

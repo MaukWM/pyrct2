@@ -47,6 +47,47 @@ def test_place_flat_ride_exit_on_footprint(game):
         )
 
 
+def test_place_flat_ride_entrance_not_adjacent(game):
+    """Entrance far from footprint raises ValueError."""
+    game.park.cheats.build_in_pause_mode()
+
+    with pytest.raises(ValueError, match="Entrance.*not adjacent"):
+        game.rides.place_flat_ride(
+            obj=RideObjects.gentle.MERRY_GO_ROUND,
+            tile=Tile(20, 20),
+            entrance=Tile(20, 28),  # far away
+            exit=Tile(20, 18),
+        )
+
+
+def test_place_flat_ride_exit_not_adjacent(game):
+    """Exit far from footprint raises ValueError."""
+    game.park.cheats.build_in_pause_mode()
+
+    with pytest.raises(ValueError, match="Exit.*not adjacent"):
+        game.rides.place_flat_ride(
+            obj=RideObjects.gentle.MERRY_GO_ROUND,
+            tile=Tile(20, 20),
+            entrance=Tile(20, 22),
+            exit=Tile(20, 10),  # far away
+        )
+
+
+def test_place_flat_ride_entrance_diagonal(game):
+    """Entrance on a diagonal tile (not cardinally adjacent) raises ValueError."""
+    game.park.cheats.build_in_pause_mode()
+
+    # 3x3 centered at (20,20) → footprint (19,19)-(21,21)
+    # (22,22) is diagonal to corner (21,21), not cardinally adjacent
+    with pytest.raises(ValueError, match="Entrance.*not adjacent"):
+        game.rides.place_flat_ride(
+            obj=RideObjects.gentle.MERRY_GO_ROUND,
+            tile=Tile(20, 20),
+            entrance=Tile(22, 22),
+            exit=Tile(20, 18),
+        )
+
+
 # ── Integration tests ────────────────────────────────────────────────
 
 
@@ -202,8 +243,8 @@ def test_place_flat_ride_on_occupied_tile(game):
         game.rides.place_flat_ride(
             obj=RideObjects.gentle.MERRY_GO_ROUND,
             tile=tile,
-            entrance=Tile(20, 23),
-            exit=Tile(20, 17),
+            entrance=Tile(22, 20),
+            exit=Tile(18, 20),
         )
 
 
@@ -223,7 +264,7 @@ def test_place_flat_ride_stacked_above_existing(game):
     _ = game.rides.place_flat_ride(
         obj=RideObjects.gentle.MERRY_GO_ROUND,
         tile=tile,
-        entrance=Tile(20, 23),
-        exit=Tile(20, 17),
+        entrance=Tile(22, 20),
+        exit=Tile(18, 20),
         height=surface_steps + 5,
     )
