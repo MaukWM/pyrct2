@@ -10,13 +10,14 @@ from pydantic import BaseModel
 
 from pyrct2.cli import BRIDGE_VERSION
 from pyrct2.connection import Connection, DEFAULT_HOST, DEFAULT_PORT
-from pyrct2.errors import ActionError
+from pyrct2.errors import ActionError, QueryError
 from pyrct2.launcher import GameInstance, launch
 from pyrct2.scenarios import Scenario
 from pyrct2._generated.actions import ActionsProxy
 from pyrct2._generated.actions import GENERATED_API_VERSION as _ACTIONS_API_VERSION
 from pyrct2._generated.state import StateProxy
 from pyrct2._generated.state import GENERATED_API_VERSION as _STATE_API_VERSION
+from pyrct2.objects import ObjectsProxy
 from pyrct2.park import ParkProxy
 from pyrct2.world._world import WorldProxy
 
@@ -41,6 +42,7 @@ class RCT2:
     state: StateProxy
     park: ParkProxy
     world: WorldProxy
+    objects: ObjectsProxy
 
     def __init__(self, connection: Connection, instance: GameInstance | None = None):
         self._connection = connection
@@ -49,6 +51,7 @@ class RCT2:
         self.state = StateProxy(self)
         self.park = ParkProxy(self)
         self.world = WorldProxy(self)
+        self.objects = ObjectsProxy(self)
 
     @classmethod
     def launch(
@@ -124,7 +127,11 @@ class RCT2:
         """Send a state query and return the payload, raising on failure."""
         resp = self.execute(endpoint, params)
         if not resp.get("success"):
-            raise RuntimeError(f"Query {endpoint!r} failed: {resp.get('error', resp)}")
+            raise QueryError(
+                endpoint=endpoint,
+                error=resp["error"],
+                message=resp["message"],
+            )
         return resp.get("payload")
 
     def advance_ticks(self, ticks: int) -> dict:

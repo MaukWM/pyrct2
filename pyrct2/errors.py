@@ -39,6 +39,16 @@ class RCT2Error(Exception):
     """Base exception for all pyrct2 errors."""
 
 
+class QueryError(RCT2Error):
+    """A bridge query returned a non-success response."""
+
+    def __init__(self, endpoint: str, error: str, message: str | None = None) -> None:
+        self.endpoint = endpoint
+        self.error = error
+        self.error_message = message
+        super().__init__(f"Query {endpoint!r} failed: {error}" + (f" — {message}" if message else ""))
+
+
 class ActionError(RCT2Error):
     """The game rejected an action (e.g. insufficient funds, invalid params)."""
 
