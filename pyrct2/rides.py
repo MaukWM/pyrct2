@@ -27,6 +27,34 @@ class RidesProxy:
     def __init__(self, client: RCT2) -> None:
         self._client = client
 
+    def get_footprint(
+        self,
+        obj: RideObjectInfo,
+        tile: Tile,
+        direction: Direction = Direction.NORTH,
+    ) -> list[Tile]:
+        """Return the tiles a flat ride will occupy when placed.
+
+        The meaning of ``tile`` depends on the ride's footprint size:
+
+        - **Odd square** (1x1, 3x3): ``tile`` is the center.
+        - **Even square** (2x2, 4x4): ``tile`` is a corner; which corner
+          depends on ``direction``.
+        - **Odd rectangle** (1x5): ``tile`` is the center; the strip runs
+          horizontally for WEST/EAST, vertically for NORTH/SOUTH.
+        - **Even rectangle** (1x4): asymmetric; offsets are direction-specific
+          (empirically measured).
+
+        Args:
+            obj: The ride object (must have tiles_x and tiles_y).
+            tile: The placement tile (passed to track_place).
+            direction: Facing direction. Defaults to NORTH.
+
+        Returns:
+            List of all tiles the ride footprint will occupy.
+        """
+        return _compute_footprint(obj, tile, direction)
+
     def place_flat_ride(
         self,
         obj: RideObjectInfo,
@@ -38,14 +66,17 @@ class RidesProxy:
     ) -> int:
         """Place a flat ride or stall with entrance and exit.
 
-        The tile is the center of the ride's footprint. For a 3x3 ride like
-        a Merry-Go-Round placed at (20, 20), the footprint occupies
-        (19,19) to (21,21). Entrance and exit must be adjacent to the
-        footprint edge.
+        The meaning of ``tile`` depends on the ride's footprint size — see
+        :meth:`get_footprint` for details. For odd-square rides like a
+        Merry-Go-Round (3x3), the tile is the center. For even-square rides
+        like Bumper Cars (4x4), the tile is a corner that rotates with direction.
+
+        Entrance and exit must be adjacent to the footprint edge but **not**
+        inside it. For stalls (1x1, no entrance/exit), use :meth:`place_stall`.
 
         Args:
             obj: The ride object to place (e.g. RideObjects.gentle.MERRY_GO_ROUND).
-            tile: The center tile to place the ride on.
+            tile: The placement tile (see get_footprint for semantics).
             entrance: The tile for the entrance (must be adjacent to footprint).
             exit: The tile for the exit (must be adjacent to footprint).
             height: Height in land steps. Defaults to the surface height of the tile.
@@ -56,65 +87,31 @@ class RidesProxy:
 
         Raises:
             RuntimeError: If the ride object is not loaded in the scenario.
-            ValueError: If height is below the surface, or no track type found.
+            ValueError: If height is below the surface, entrance/exit overlaps
+                footprint, or no track type found.
             ActionError: If placement fails (terrain, clearance, ownership, etc.).
         """
-        # Step 1: Resolve object index
-        obj_index = self._client.objects._require_loaded_index(obj)
+        # Step 0: Validate entrance/exit against footprint
+        footprint = _compute_footprint(obj, tile, direction)
+        footprint_set = set(footprint)
+        if entrance in footprint_set:
+            raise ValueError(
+                f"Entrance {entrance} is inside the ride footprint. "
+                f"Place it on a tile adjacent to the footprint edge, not on top of it."
+            )
+        if exit in footprint_set:
+            raise ValueError(
+                f"Exit {exit} is inside the ride footprint. "
+                f"Place it on a tile adjacent to the footprint edge, not on top of it."
+            )
+        ride_id, ride_type = self._create_ride(obj, tile, height, direction)
 
-        # Step 2: Resolve ride type and track type
-        ride_type = _resolve_ride_type(obj)
-        track_type = _resolve_track_type(obj)
-
-        # Step 3: Create ride (free — just allocates a slot)
-        # TODO: Action results are untyped dicts. Codegen should generate typed
-        # response models from the d.ts *ActionResult interfaces (e.g.
-        # RideCreateActionResult with .ride, TrackPlaceActionResult with .position).
-        result = self._client.actions.ride_create(
-            ride_type=ride_type,
-            ride_object=obj_index,
-            entrance_object=0,
-            colour1=0,
-            colour2=0,
-            inspection_interval=RideInspection.EVERY30_MINUTES,
-        )
-        ride_id = result["payload"]["ride"]
-
-        # TODO: Add rollback/transaction support. If track_place or entrance/exit
-        # placement fails after ride_create, the ride slot is orphaned. A general
+        # TODO: Add rollback/transaction support. If entrance/exit placement
+        # fails after ride_create, the ride slot is orphaned. A general
         # transaction pattern (context manager?) would auto-demolish on failure.
         # For now, failures leave an orphaned ride that the developer must clean up.
 
-        # Step 4: Resolve height
-        surface_z = self._client.world.get_tile(tile).surface.baseZ
-        if height is not None:
-            z = height * LAND_HEIGHT_STEP
-            if z < surface_z:
-                raise ValueError(
-                    f"Height {height} land steps (z={z}) is below the surface at "
-                    f"tile ({tile.x}, {tile.y}) which is at {surface_z // LAND_HEIGHT_STEP} "
-                    f"land steps (z={surface_z}). Raise the land first or use a higher value."
-                )
-        else:
-            z = surface_z
-
-        # Step 5: Place track (this is where money is spent)
-        self._client.actions.track_place(
-            x=tile.x * TILE_SIZE,
-            y=tile.y * TILE_SIZE,
-            z=z,
-            direction=direction,
-            ride=ride_id,
-            track_type=track_type,
-            ride_type=ride_type,
-            brake_speed=0,
-            colour=0,
-            seat_rotation=4,
-            track_place_flags=SelectedLiftAndInverted(0),
-            is_from_track_design=False,
-        )
-
-        # Step 6: Place entrance and exit
+        # Place entrance and exit
         self._client.actions.ride_entrance_exit_place(
             x=entrance.x * TILE_SIZE,
             y=entrance.y * TILE_SIZE,
@@ -133,6 +130,83 @@ class RidesProxy:
         )
 
         return ride_id
+
+    def place_stall(
+        self,
+        obj: RideObjectInfo,
+        tile: Tile,
+        height: int | None = None,
+        direction: Direction = Direction.NORTH,
+    ) -> int:
+        """Place a stall (shop, food stand, restroom, etc.).
+
+        Stalls are 1x1 rides that don't need entrance or exit. The direction
+        controls which way the stall faces (where guests approach from).
+
+        Args:
+            obj: A stall object (e.g. RideObjects.stall.BURGER_BAR).
+            tile: The tile to place the stall on.
+            height: Height in land steps. Defaults to surface height.
+            direction: Facing direction. Defaults to NORTH.
+
+        Returns:
+            The ride ID (int) for use with open(), demolish(), etc.
+
+        Raises:
+            ValueError: If the object is not a stall, or height is below surface.
+            RuntimeError: If the stall object is not loaded in the scenario.
+            ActionError: If placement fails (terrain, clearance, ownership, etc.).
+        """
+        _require_stall(obj)
+        ride_id, _ = self._create_ride(obj, tile, height, direction)
+        return ride_id
+
+    def _create_ride(
+        self,
+        obj: RideObjectInfo,
+        tile: Tile,
+        height: int | None,
+        direction: Direction,
+    ) -> tuple[int, RideType]:
+        """Shared flow: resolve object → create ride slot → resolve height → place track.
+
+        Returns (ride_id, ride_type).
+        """
+        obj_index = self._client.objects._require_loaded_index(obj)
+        ride_type = _resolve_ride_type(obj)
+        track_type = _resolve_track_type(obj)
+
+        # TODO: Action results are untyped dicts. Codegen should generate typed
+        # response models from the d.ts *ActionResult interfaces (e.g.
+        # RideCreateActionResult with .ride, TrackPlaceActionResult with .position).
+        result = self._client.actions.ride_create(
+            ride_type=ride_type,
+            ride_object=obj_index,
+            entrance_object=0,
+            colour1=0,
+            colour2=0,
+            inspection_interval=RideInspection.EVERY30_MINUTES,
+        )
+        ride_id = result["payload"]["ride"]
+
+        z = _resolve_height(self._client, tile, height)
+
+        self._client.actions.track_place(
+            x=tile.x * TILE_SIZE,
+            y=tile.y * TILE_SIZE,
+            z=z,
+            direction=direction,
+            ride=ride_id,
+            track_type=track_type,
+            ride_type=ride_type,
+            brake_speed=0,
+            colour=0,
+            seat_rotation=4,
+            track_place_flags=SelectedLiftAndInverted(0),
+            is_from_track_design=False,
+        )
+
+        return ride_id, ride_type
 
     def open(self, ride_id: int) -> ActionResult:
         """Open a ride for guests."""
@@ -165,6 +239,84 @@ class RidesProxy:
 
 
 # ── Helpers ───────────────────────────────────────────────────────────
+
+
+def _resolve_height(client: RCT2, tile: Tile, height: int | None) -> int:
+    """Return world-unit Z for the given height, or surface height if None."""
+    surface_z = client.world.get_tile(tile).surface.baseZ
+    if height is not None:
+        z = height * LAND_HEIGHT_STEP
+        if z < surface_z:
+            raise ValueError(
+                f"Height {height} land steps (z={z}) is below the surface at "
+                f"tile ({tile.x}, {tile.y}) which is at {surface_z // LAND_HEIGHT_STEP} "
+                f"land steps (z={surface_z}). Raise the land first or use a higher value."
+            )
+        return z
+    return surface_z
+
+
+def _compute_footprint(obj: RideObjectInfo, tile: Tile, direction: Direction) -> list[Tile]:
+    """Compute the tiles occupied by a flat ride.
+
+    Algorithm derived from empirical probing of all 6 footprint sizes across all 4 directions.
+    """
+    tx, ty = obj.tiles_x, obj.tiles_y
+    if tx is None or ty is None:
+        raise ValueError(f"'{obj.name}' ({obj.identifier}) has no footprint dimensions (tiles_x/tiles_y).")
+
+    # 1x1: trivial
+    if tx == 1 and ty == 1:
+        return [tile]
+
+    # Odd square (3x3, etc.): centered on placement tile, direction ignored
+    if tx == ty and tx % 2 == 1:
+        half = (tx - 1) // 2
+        return [Tile(tile.x + dx, tile.y + dy) for dx in range(-half, half + 1) for dy in range(-half, half + 1)]
+
+    # Even square (2x2, 4x4): placement tile is a corner, block rotates with direction
+    if tx == ty and tx % 2 == 0:
+        n = tx
+        offsets = {
+            Direction.WEST: (0, 0),
+            Direction.NORTH: (0, -(n - 1)),
+            Direction.EAST: (-(n - 1), -(n - 1)),
+            Direction.SOUTH: (-(n - 1), 0),
+        }
+        ox, oy = offsets[direction]
+        return [Tile(tile.x + ox + i, tile.y + oy + j) for i in range(n) for j in range(n)]
+
+    # Rectangular rides
+    length = max(tx, ty)
+
+    # Odd-length rectangle (1x5): centered, flips orientation with direction
+    if length % 2 == 1:
+        half = (length - 1) // 2
+        if direction in (Direction.WEST, Direction.EAST):
+            return [Tile(tile.x + dx, tile.y) for dx in range(-half, half + 1)]
+        return [Tile(tile.x, tile.y + dy) for dy in range(-half, half + 1)]
+
+    # Even-length rectangle (1x4): asymmetric, empirically measured per direction
+    # Measured for FLAT_TRACK1X4_C (Ferris Wheel). Other even-length rectangular
+    # track types may differ — see research doc caveat.
+    if direction == Direction.WEST:
+        return [Tile(tile.x + dx, tile.y) for dx in (-2, -1, 0, 1)]
+    if direction == Direction.NORTH:
+        return [Tile(tile.x, tile.y + dy) for dy in (-1, 0, 1, 2)]
+    if direction == Direction.EAST:
+        return [Tile(tile.x + dx, tile.y) for dx in (-1, 0, 1, 2)]
+    # SOUTH
+    return [Tile(tile.x, tile.y + dy) for dy in (-2, -1, 0, 1)]
+
+
+def _require_stall(obj: RideObjectInfo) -> None:
+    """Raise ValueError if the object is not a stall."""
+    category = obj.category if isinstance(obj.category, str) else obj.category[0] if obj.category else ""
+    if category != "stall":
+        raise ValueError(
+            f"'{obj.name}' ({obj.identifier}) is not a stall (category='{obj.category}'). "
+            f"Use place_flat_ride() for non-stall rides."
+        )
 
 
 def _resolve_ride_type(obj: RideObjectInfo) -> RideType:
