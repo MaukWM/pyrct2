@@ -19,6 +19,7 @@ from pyrct2._generated.state import StateProxy
 from pyrct2._generated.state import GENERATED_API_VERSION as _STATE_API_VERSION
 from pyrct2.objects import ObjectsProxy
 from pyrct2.park import ParkProxy
+from pyrct2.rides import RidesProxy
 from pyrct2.world._world import WorldProxy
 
 if _ACTIONS_API_VERSION != _STATE_API_VERSION:
@@ -43,6 +44,7 @@ class RCT2:
     park: ParkProxy
     world: WorldProxy
     objects: ObjectsProxy
+    rides: RidesProxy
 
     def __init__(self, connection: Connection, instance: GameInstance | None = None):
         self._connection = connection
@@ -52,6 +54,7 @@ class RCT2:
         self.park = ParkProxy(self)
         self.world = WorldProxy(self)
         self.objects = ObjectsProxy(self)
+        self.rides = RidesProxy(self)
 
     @classmethod
     def launch(
