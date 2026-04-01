@@ -143,4 +143,33 @@ def test_place_stall_in_the_sky(game):
 
     track = game.world.get_tile(tile).tracks[0]
     assert track.baseZ == target_height * LAND_HEIGHT_STEP
-    assert track.baseZ > game.world.get_tile(tile).surface.baseZ
+
+
+def test_place_stall_on_occupied_tile(game):
+    """Placing a stall on an occupied tile without explicit height raises ActionError."""
+    from pyrct2.errors import ActionError
+
+    game.park.cheats.build_in_pause_mode()
+
+    tile = Tile(20, 20)
+    game.rides.place_stall(obj=RideObjects.stall.BURGER_BAR, tile=tile)
+
+    with pytest.raises(ActionError):
+        game.rides.place_stall(obj=RideObjects.stall.BURGER_BAR, tile=tile)
+
+
+def test_place_stall_stacked_above_existing(game):
+    """Placing a stall above an existing one with explicit height succeeds."""
+    from pyrct2.world._slope import LAND_HEIGHT_STEP
+
+    game.park.cheats.build_in_pause_mode()
+
+    tile = Tile(20, 20)
+    game.rides.place_stall(obj=RideObjects.stall.BURGER_BAR, tile=tile)
+
+    surface_steps = game.world.get_tile(tile).surface.baseZ // LAND_HEIGHT_STEP
+    _ = game.rides.place_stall(
+        obj=RideObjects.stall.BURGER_BAR,
+        tile=tile,
+        height=surface_steps + 5,
+    )
