@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from pyrct2._generated.enums import Colour, StaffSetPatrolAreaMode, StaffType
 from pyrct2._generated.state import Staff
 from pyrct2.result import ActionResult
+from pyrct2._peep import _peep_move
 from pyrct2.world import Tile
 
 if TYPE_CHECKING:
@@ -52,7 +53,27 @@ class StaffEntity:
         """Tile this staff member is standing on (floored from world coords)."""
         return Tile.from_world(self.data.x, self.data.y)
 
+    def refresh(self) -> None:
+        """Re-fetch this staff member's state from the game."""
+        for s in self._client.state.staff():
+            if s.id == self._id:
+                self.data = s
+                return
+
     # -- Write methods --
+
+    def move_to(self, tile: Tile, height: int | None = None) -> None:
+        """Pick up this staff member and place them on the target tile.
+
+        Args:
+            tile: Destination tile.
+            height: Height in land steps. If None, places at surface height.
+
+        Raises:
+            ValueError: If height is below the tile's surface.
+        """
+        z = self._client.world.resolve_height(tile, height)
+        _peep_move(self._client, self._id, tile, z)
 
     def fire(self) -> ActionResult:
         return ActionResult.from_response(self._client.actions.staff_fire(id=self._id))

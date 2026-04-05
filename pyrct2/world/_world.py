@@ -136,6 +136,32 @@ class WorldProxy:
         }
         return len(heights) == 1
 
+    # ── Height helpers ─────────────────────────────────────────────────
+
+    def resolve_height(self, tile: Tile, height: int | None = None) -> int:
+        """Return world-unit Z for the given height in land steps, or surface height if None.
+
+        Args:
+            tile: The tile to check.
+            height: Height in land steps. If None, returns the surface height.
+
+        Raises:
+            ValueError: If the height is below the tile's surface.
+        """
+        from pyrct2.world._slope import LAND_HEIGHT_STEP
+
+        surface_z = self.get_tile(tile).surface.baseZ
+        if height is not None:
+            z = height * LAND_HEIGHT_STEP
+            if z < surface_z:
+                raise ValueError(
+                    f"Height {height} land steps (z={z}) is below the surface at "
+                    f"tile ({tile.x}, {tile.y}) which is at {surface_z // LAND_HEIGHT_STEP} "
+                    f"land steps (z={surface_z})."
+                )
+            return z
+        return surface_z
+
     # ── Terraform ─────────────────────────────────────────────────────
 
     def set_height(self, tile: Tile, height: int, slope: int = 0) -> ActionResult:

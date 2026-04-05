@@ -1,10 +1,11 @@
-"""GuestsProxy and GuestEntity — read-only guest observation."""
+"""GuestsProxy and GuestEntity — guest observation and interaction."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
 from pyrct2._generated.state import Guest
+from pyrct2._peep import _peep_move
 from pyrct2.world import Tile
 
 if TYPE_CHECKING:
@@ -12,7 +13,7 @@ if TYPE_CHECKING:
 
 
 class GuestEntity:
-    """Wrapper around a Guest snapshot. Read-only for now.
+    """Wrapper around a Guest snapshot.
 
     All properties are accessible via ``.data`` (the Pydantic model snapshot).
     """
@@ -34,6 +35,26 @@ class GuestEntity:
     def tile(self) -> Tile:
         """Tile this guest is standing on (floored from world coords)."""
         return Tile.from_world(self.data.x, self.data.y)
+
+    def refresh(self) -> None:
+        """Re-fetch this guest's state from the game."""
+        for g in self._client.state.guests():
+            if g.id == self._id:
+                self.data = g
+                return
+
+    def move_to(self, tile: Tile, height: int | None = None) -> None:
+        """Pick up this guest and place them on the target tile.
+
+        Args:
+            tile: Destination tile.
+            height: Height in land steps. If None, places at surface height.
+
+        Raises:
+            ValueError: If height is below the tile's surface.
+        """
+        z = self._client.world.resolve_height(tile, height)
+        _peep_move(self._client, self._id, tile, z)
 
 
 class GuestsProxy:

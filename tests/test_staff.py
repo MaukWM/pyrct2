@@ -34,6 +34,22 @@ def test_rename(game):
     assert game.park.staff.get(staff.data.id).data.name == "Bob"
 
 
+def test_staff_entity_refresh(game):
+    """Staff entity data is stale after write, refresh() updates it."""
+    staff = game.park.staff.hire(StaffType.HANDYMAN)
+    old_name = staff.data.name
+
+    staff.rename("Refreshed Bob")
+
+    # Data is stale
+    assert staff.data.name == old_name
+
+    staff.refresh()
+
+    # Now it's updated
+    assert staff.data.name == "Refreshed Bob"
+
+
 def test_fire(game):
     staff = game.park.staff.hire(StaffType.HANDYMAN)
     entity_id = staff.data.id
@@ -46,6 +62,18 @@ def test_set_colour(game):
     staff.set_colour(Colour.BRIGHT_RED)
     refreshed = game.park.staff.get(staff.data.id)
     assert refreshed.data.colour == Colour.BRIGHT_RED
+
+
+def test_staff_move_to(game):
+    """Move a staff member to different tiles."""
+    staff = game.park.staff.hire(StaffType.HANDYMAN)
+    staff.move_to(Tile(5, 5))
+    staff.refresh()
+    assert staff.tile == Tile(5, 5)
+
+    staff.move_to(Tile(6, 6))
+    staff.refresh()
+    assert staff.tile == Tile(6, 6)
 
 
 def test_set_patrol_area(game):
