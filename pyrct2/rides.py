@@ -110,6 +110,47 @@ class RideEntity:
             direction=Direction(e.direction),
         )
 
+    # -- Write methods --
+
+    def set_price(self, price: int) -> ActionResult:
+        """Set the ride/stall entry price."""
+        return ActionResult.from_response(
+            self._client.actions.ride_set_price(
+                ride=self._id,
+                price=price,
+                is_primary_price=True,
+            )
+        )
+
+    def open(self) -> ActionResult:
+        """Open the ride/stall for guests."""
+        return ActionResult.from_response(
+            self._client.actions.ride_set_status(
+                ride=self._id,
+                status=RideStatus.OPEN,
+            )
+        )
+
+    def close(self) -> ActionResult:
+        """Close the ride/stall."""
+        return ActionResult.from_response(
+            self._client.actions.ride_set_status(
+                ride=self._id,
+                status=RideStatus.CLOSED,
+            )
+        )
+
+    def demolish(self) -> ActionResult:
+        """Demolish the ride/stall, removing it from the map."""
+        from pyrct2._generated.enums import RideModifyType
+
+        return ActionResult.from_response(
+            self._client.actions.ride_demolish(
+                ride=self._id,
+                modify_type=RideModifyType.DEMOLISH,
+            )
+        )
+
 
 class RidesProxy:
     """Ride queries, placement, and management: ``game.rides``."""

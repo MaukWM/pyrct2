@@ -392,3 +392,88 @@ def test_stall_entity_properties(game):
     # Stalls have no entrance/exit
     assert stall.entrance is None
     assert stall.exit is None
+
+
+# ── RideEntity write method tests ────────────────────────────────────
+
+
+def test_ride_entity_open_close(game):
+    """Open and close a ride via entity methods."""
+    game.park.cheats.build_in_pause_mode()
+
+    ride_id = game.rides.place_flat_ride(
+        obj=RideObjects.gentle.MERRY_GO_ROUND,
+        tile=Tile(20, 20),
+        entrance=Tile(20, 22),
+        exit=Tile(20, 18),
+    )
+
+    ride = game.rides.get(ride_id)
+    assert ride.data.status == "closed"
+
+    ride.open()
+    assert game.rides.get(ride_id).data.status == "open"
+
+    ride.close()
+    assert game.rides.get(ride_id).data.status == "closed"
+
+
+def test_ride_entity_set_price(game):
+    """Set ride entry price via entity."""
+    game.park.cheats.build_in_pause_mode()
+
+    ride_id = game.rides.place_flat_ride(
+        obj=RideObjects.gentle.MERRY_GO_ROUND,
+        tile=Tile(20, 20),
+        entrance=Tile(20, 22),
+        exit=Tile(20, 18),
+    )
+
+    ride = game.rides.get(ride_id)
+    ride.set_price(50)
+    assert game.rides.get(ride_id).data.price[0] == 50
+
+
+def test_stall_entity_set_price(game):
+    """Set stall price via entity."""
+    game.park.cheats.build_in_pause_mode()
+
+    stall_id = game.rides.place_stall(
+        obj=RideObjects.stall.BURGER_BAR,
+        tile=Tile(20, 20),
+    )
+
+    stall = game.rides.get(stall_id)
+    stall.set_price(30)
+    assert game.rides.get(stall_id).data.price[0] == 30
+
+
+def test_ride_entity_demolish(game):
+    """Demolish a ride via entity, verify it's gone."""
+    game.park.cheats.build_in_pause_mode()
+
+    ride_id = game.rides.place_flat_ride(
+        obj=RideObjects.gentle.MERRY_GO_ROUND,
+        tile=Tile(20, 20),
+        entrance=Tile(20, 22),
+        exit=Tile(20, 18),
+    )
+
+    ride = game.rides.get(ride_id)
+    ride.demolish()
+    assert game.rides.get(ride_id) is None
+    assert game.rides.list() == []
+
+    # Place again on the same tile, verify it works
+    ride_id_2 = game.rides.place_flat_ride(
+        obj=RideObjects.gentle.MERRY_GO_ROUND,
+        tile=Tile(20, 20),
+        entrance=Tile(20, 22),
+        exit=Tile(20, 18),
+    )
+    ride_2 = game.rides.get(ride_id_2)
+    assert ride_2 is not None
+    assert len(game.rides.list()) == 1
+
+    ride_2.demolish()
+    assert game.rides.list() == []
