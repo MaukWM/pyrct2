@@ -479,6 +479,31 @@ def test_ride_entity_demolish(game):
     assert game.rides.list() == []
 
 
+def test_ride_entity_refresh(game):
+    """Entity data is stale after write, refresh() updates it."""
+    game.park.cheats.build_in_pause_mode()
+
+    ride_id = game.rides.place_flat_ride(
+        obj=RideObjects.gentle.MERRY_GO_ROUND,
+        tile=Tile(20, 20),
+        entrance=Tile(20, 22),
+        exit=Tile(20, 18),
+    )
+
+    ride = game.rides.get(ride_id)
+    old_price = ride.data.price[0]
+
+    ride.set_price(77)
+
+    # Data is stale — still shows old price
+    assert ride.data.price[0] == old_price
+
+    ride.refresh()
+
+    # Now it's updated
+    assert ride.data.price[0] == 77
+
+
 def test_ride_entity_set_wait_times(game):
     """Set min and max wait times via entity."""
     game.park.cheats.build_in_pause_mode()
