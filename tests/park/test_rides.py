@@ -4,7 +4,7 @@ import pytest
 
 from pyrct2._generated.enums import Direction, RideInspection
 from pyrct2._generated.objects import RideObjects
-from pyrct2.rides import RideEntity, StationAccess
+from pyrct2.park import RideEntity, StationAccess
 from pyrct2.world import Tile
 from pyrct2.world._slope import LAND_HEIGHT_STEP
 

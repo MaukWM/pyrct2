@@ -18,8 +18,7 @@ from pyrct2._generated.actions import GENERATED_API_VERSION as _ACTIONS_API_VERS
 from pyrct2._generated.state import StateProxy
 from pyrct2._generated.state import GENERATED_API_VERSION as _STATE_API_VERSION
 from pyrct2.objects import ObjectsProxy
-from pyrct2.park import ParkProxy
-from pyrct2.rides import RidesProxy
+from pyrct2.park import ParkProxy, RidesProxy
 from pyrct2.world._world import WorldProxy
 
 if _ACTIONS_API_VERSION != _STATE_API_VERSION:

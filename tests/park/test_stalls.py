@@ -4,7 +4,7 @@ import pytest
 
 from pyrct2._generated.enums import Direction
 from pyrct2._generated.objects import RideObjects
-from pyrct2.rides import _require_stall
+from pyrct2.park._rides import _require_stall
 from pyrct2.world import Tile
 
 
