@@ -22,24 +22,27 @@ import pytest
 
 from pyrct2._generated.enums import Direction
 from pyrct2._generated.objects import RideObjects
-from pyrct2.rides import _compute_footprint
+from pyrct2.rides import _adjacent_tiles, _compute_footprint
 from pyrct2.world import Tile
 
 
 # Center placement tile — far enough from edges for all footprints + scan radius.
 CENTER = Tile(26, 26)
-
-# Scan radius around the placement tile to detect actual track elements.
 SCAN_RADIUS = 6
+
+
+def _pick_entrance_exit(footprint: set[Tile]) -> tuple[Tile, Tile]:
+    """Pick entrance (max y) and exit (min y) from tiles adjacent to the footprint."""
+    adjacent = sorted(_adjacent_tiles(footprint), key=lambda t: (t.y, t.x))
+    return adjacent[-1], adjacent[0]
 
 
 def _actual_footprint(game, ride_id: int) -> set[Tile]:
     """Scan the map and return tiles that have track elements for the given ride."""
     from_tile = Tile(CENTER.x - SCAN_RADIUS, CENTER.y - SCAN_RADIUS)
     to_tile = Tile(CENTER.x + SCAN_RADIUS, CENTER.y + SCAN_RADIUS)
-    tiles = game.world.get_tiles(from_tile, to_tile)
     result = set()
-    for td in tiles:
+    for td in game.world.get_tiles(from_tile, to_tile):
         for track in td.tracks:
             if track.ride == ride_id:
                 result.add(Tile(td.x, td.y))
@@ -50,18 +53,14 @@ def _place_and_check(game, obj, direction):
     """Place a ride, compare actual vs computed footprint, then demolish."""
     computed = set(_compute_footprint(obj, CENTER, direction))
 
-    # Ensure the object is loaded in the scenario.
     if not game.objects.is_loaded(obj):
         game.objects.load(obj)
 
-    # Stalls use place_stall (no entrance/exit), rides use place_flat_ride.
     category = obj.category if isinstance(obj.category, str) else obj.category[0]
     if category == "stall":
         ride_id = game.rides.place_stall(obj=obj, tile=CENTER, direction=direction)
     else:
-        # Pick entrance/exit well outside any possible footprint.
-        entrance = Tile(CENTER.x, CENTER.y + SCAN_RADIUS)
-        exit_tile = Tile(CENTER.x, CENTER.y - SCAN_RADIUS)
+        entrance, exit_tile = _pick_entrance_exit(computed)
         ride_id = game.rides.place_flat_ride(
             obj=obj,
             tile=CENTER,
