@@ -1,4 +1,4 @@
-"""RidesProxy — ride placement and management."""
+"""RidesProxy and RideEntity — ride queries, placement, and management."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from pyrct2._generated.enums import (
     TrackElemType,
 )
 from pyrct2._generated.objects import RIDE_TYPE_TRACK_ELEMS, RideObjectInfo
+from pyrct2._generated.state import Ride
 from pyrct2.result import ActionResult
 from pyrct2.world._slope import LAND_HEIGHT_STEP
 from pyrct2.world._tile import TILE_SIZE, Tile
@@ -21,18 +22,54 @@ if TYPE_CHECKING:
     from pyrct2.client import RCT2
 
 
-class RidesProxy:
-    """Ride placement and management: ``game.rides``.
+class RideEntity:
+    """Wrapper around a Ride snapshot that adds action methods.
 
-    # TODO: Add query methods: get(ride_id), list(), list_stalls() etc.
-    # Currently ride state is only accessible via game.state.rides() which
-    # returns raw Ride models with no category filtering. A higher-level
-    # API here would let developers do game.rides.get(ride_id).status,
-    # game.rides.list_stalls(), etc.
+    All properties are accessible via ``.data`` (the Pydantic model snapshot).
+    Action methods send game commands via the client.
     """
+
+    def __init__(self, client: RCT2, model: Ride) -> None:
+        self._client = client
+        self.data = model
+
+    def __repr__(self) -> str:
+        return f"RideEntity(#{self.data.id} {self.data.name!r} {self.data.status})"
+
+    @property
+    def _id(self) -> int:
+        return self.data.id
+
+    # -- Read helpers --
+
+    @property
+    def name(self) -> str:
+        return self.data.name
+
+    @property
+    def status(self) -> str:
+        """Ride status: "closed", "open", "testing", or "simulating".
+
+        TODO: Return a StrEnum once codegen Step 3 (enums.json → state.py.j2)
+        maps string state fields to generated enums.
+        """
+        return self.data.status
+
+
+class RidesProxy:
+    """Ride queries, placement, and management: ``game.rides``."""
 
     def __init__(self, client: RCT2) -> None:
         self._client = client
+
+    # -- Query methods --
+
+    def get(self, ride_id: int) -> RideEntity | None:
+        """Get a specific ride by ID, or None if not found."""
+        for r in self._client.state.rides():
+            if r.id == ride_id:
+                return RideEntity(self._client, r)
+        return None
 
     def get_footprint(
         self,
@@ -255,6 +292,10 @@ class RidesProxy:
                 modify_type=RideModifyType.DEMOLISH,
             )
         )
+
+    def list(self) -> list[RideEntity]:
+        """Return all rides as entity wrappers."""
+        return [RideEntity(self._client, r) for r in self._client.state.rides()]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────

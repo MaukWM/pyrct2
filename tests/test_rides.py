@@ -1,9 +1,10 @@
-"""Integration tests for game.rides.place_flat_ride()."""
+"""Integration tests for ride placement and RideEntity queries."""
 
 import pytest
 
 from pyrct2._generated.enums import Direction
 from pyrct2._generated.objects import RideObjects
+from pyrct2.rides import RideEntity
 from pyrct2.world import Tile
 from pyrct2.world._slope import LAND_HEIGHT_STEP
 
@@ -268,3 +269,69 @@ def test_place_flat_ride_stacked_above_existing(game):
         exit=Tile(18, 20),
         height=surface_steps + 5,
     )
+
+
+# ── RideEntity query tests ──────────────────────────────────────────
+
+
+def test_list_empty(game):
+    """Empty park has no rides."""
+    assert game.rides.list() == []
+
+
+def test_list_multiple(game):
+    """Multiple placed rides all appear in list."""
+    game.park.cheats.build_in_pause_mode()
+
+    game.rides.place_flat_ride(
+        obj=RideObjects.gentle.MERRY_GO_ROUND,
+        tile=Tile(20, 20),
+        entrance=Tile(20, 22),
+        exit=Tile(20, 18),
+    )
+    game.rides.place_flat_ride(
+        obj=RideObjects.gentle.MERRY_GO_ROUND,
+        tile=Tile(30, 20),
+        entrance=Tile(30, 22),
+        exit=Tile(30, 18),
+    )
+
+    rides = game.rides.list()
+    assert len(rides) == 2
+    assert all(isinstance(r, RideEntity) for r in rides)
+    assert rides[0].name == "Merry-Go-Round 1"
+    assert rides[1].name == "Merry-Go-Round 2"
+    assert rides[0].status == "closed"
+    assert rides[1].status == "closed"
+
+
+def test_get_multiple(game):
+    """Get correct ride by ID when multiple exist."""
+    game.park.cheats.build_in_pause_mode()
+
+    id_1 = game.rides.place_flat_ride(
+        obj=RideObjects.gentle.MERRY_GO_ROUND,
+        tile=Tile(20, 20),
+        entrance=Tile(20, 22),
+        exit=Tile(20, 18),
+    )
+    id_2 = game.rides.place_flat_ride(
+        obj=RideObjects.gentle.MERRY_GO_ROUND,
+        tile=Tile(30, 20),
+        entrance=Tile(30, 22),
+        exit=Tile(30, 18),
+    )
+
+    ride_1 = game.rides.get(id_1)
+    ride_2 = game.rides.get(id_2)
+    assert ride_1 is not None
+    assert ride_2 is not None
+    assert ride_1._id == id_1
+    assert ride_2._id == id_2
+    assert ride_1.name == "Merry-Go-Round 1"
+    assert ride_2.name == "Merry-Go-Round 2"
+
+
+def test_get_nonexistent(game):
+    """Get a ride that doesn't exist returns None."""
+    assert game.rides.get(999) is None
