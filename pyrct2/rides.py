@@ -19,7 +19,6 @@ from pyrct2._generated.enums import (
 from pyrct2._generated.objects import RIDE_TYPE_TRACK_ELEMS, RideObjectInfo
 from pyrct2._generated.state import Ride
 from pyrct2.result import ActionResult
-from pyrct2.world._slope import LAND_HEIGHT_STEP
 from pyrct2.world._tile import TILE_SIZE, Tile
 
 if TYPE_CHECKING:
@@ -111,6 +110,13 @@ class RideEntity:
             tile=Tile.from_world(e.x, e.y),
             direction=Direction(e.direction),
         )
+
+    def refresh(self) -> None:
+        """Re-fetch this ride's state from the game."""
+        for r in self._client.state.rides():
+            if r.id == self._id:
+                self.data = r
+                return
 
     # -- Write methods --
 
@@ -371,7 +377,7 @@ class RidesProxy:
         )
         ride_id = result["payload"]["ride"]
 
-        z = _resolve_height(self._client, tile, height)
+        z = self._client.world.resolve_height(tile, height)
 
         self._client.actions.track_place(
             x=tile.x * TILE_SIZE,
@@ -434,21 +440,6 @@ def _adjacent_tiles(footprint: set[Tile]) -> set[Tile]:
             if neighbor not in footprint:
                 adjacent.add(neighbor)
     return adjacent
-
-
-def _resolve_height(client: RCT2, tile: Tile, height: int | None) -> int:
-    """Return world-unit Z for the given height, or surface height if None."""
-    surface_z = client.world.get_tile(tile).surface.baseZ
-    if height is not None:
-        z = height * LAND_HEIGHT_STEP
-        if z < surface_z:
-            raise ValueError(
-                f"Height {height} land steps (z={z}) is below the surface at "
-                f"tile ({tile.x}, {tile.y}) which is at {surface_z // LAND_HEIGHT_STEP} "
-                f"land steps (z={surface_z}). Raise the land first or use a higher value."
-            )
-        return z
-    return surface_z
 
 
 def _compute_footprint(obj: RideObjectInfo, tile: Tile, direction: Direction) -> list[Tile]:
