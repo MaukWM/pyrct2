@@ -4,7 +4,7 @@ import pytest
 
 from pyrct2._generated.enums import Direction
 from pyrct2._generated.objects import RideObjects
-from pyrct2.rides import RideEntity
+from pyrct2.rides import RideEntity, StationAccess
 from pyrct2.world import Tile
 from pyrct2.world._slope import LAND_HEIGHT_STEP
 
@@ -299,10 +299,10 @@ def test_list_multiple(game):
     rides = game.rides.list()
     assert len(rides) == 2
     assert all(isinstance(r, RideEntity) for r in rides)
-    assert rides[0].name == "Merry-Go-Round 1"
-    assert rides[1].name == "Merry-Go-Round 2"
-    assert rides[0].status == "closed"
-    assert rides[1].status == "closed"
+    assert rides[0].data.name == "Merry-Go-Round 1"
+    assert rides[1].data.name == "Merry-Go-Round 2"
+    assert rides[0].data.status == "closed"
+    assert rides[1].data.status == "closed"
 
 
 def test_get_multiple(game):
@@ -328,10 +328,67 @@ def test_get_multiple(game):
     assert ride_2 is not None
     assert ride_1._id == id_1
     assert ride_2._id == id_2
-    assert ride_1.name == "Merry-Go-Round 1"
-    assert ride_2.name == "Merry-Go-Round 2"
+    assert ride_1.data.name == "Merry-Go-Round 1"
+    assert ride_2.data.name == "Merry-Go-Round 2"
 
 
 def test_get_nonexistent(game):
     """Get a ride that doesn't exist returns None."""
     assert game.rides.get(999) is None
+
+
+# ── RideEntity property tests ───────────────────────────────────────
+
+
+def test_ride_entity_properties(game):
+    """Ride entity returns correct placement_tile, entrance, exit, and direction=None."""
+    game.park.cheats.build_in_pause_mode()
+
+    ride_id = game.rides.place_flat_ride(
+        obj=RideObjects.gentle.MERRY_GO_ROUND,
+        tile=Tile(20, 20),
+        entrance=Tile(20, 22),
+        exit=Tile(20, 18),
+        direction=Direction.EAST,
+    )
+
+    ride = game.rides.get(ride_id)
+
+    # Placement tile matches what was passed to place_flat_ride
+    assert ride.placement_tile == Tile(20, 20)
+
+    # Rides don't have a meaningful direction
+    assert ride.direction is None
+
+    # Entrance
+    assert isinstance(ride.entrance, StationAccess)
+    assert ride.entrance.tile == Tile(20, 22)
+    assert ride.entrance.direction == Direction.EAST
+
+    # Exit
+    assert isinstance(ride.exit, StationAccess)
+    assert ride.exit.tile == Tile(20, 18)
+    assert ride.exit.direction == Direction.EAST
+
+
+def test_stall_entity_properties(game):
+    """Stall entity returns correct placement_tile, direction, and entrance/exit=None."""
+    game.park.cheats.build_in_pause_mode()
+
+    stall_id = game.rides.place_stall(
+        obj=RideObjects.stall.BURGER_BAR,
+        tile=Tile(25, 25),
+        direction=Direction.SOUTH,
+    )
+
+    stall = game.rides.get(stall_id)
+
+    # Placement tile matches
+    assert stall.placement_tile == Tile(25, 25)
+
+    # Stalls have a facing direction
+    assert stall.direction == Direction.SOUTH
+
+    # Stalls have no entrance/exit
+    assert stall.entrance is None
+    assert stall.exit is None

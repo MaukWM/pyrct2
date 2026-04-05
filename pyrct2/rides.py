@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pydantic import BaseModel, ConfigDict
+
 from pyrct2._generated.enums import (
     Direction,
     RideInspection,
@@ -20,6 +22,15 @@ from pyrct2.world._tile import TILE_SIZE, Tile
 
 if TYPE_CHECKING:
     from pyrct2.client import RCT2
+
+
+class StationAccess(BaseModel):
+    """A station entrance or exit: tile position + facing direction."""
+
+    model_config = ConfigDict(frozen=True)
+
+    tile: Tile
+    direction: Direction
 
 
 class RideEntity:
@@ -43,17 +54,61 @@ class RideEntity:
     # -- Read helpers --
 
     @property
-    def name(self) -> str:
-        return self.data.name
+    def placement_tile(self) -> Tile:
+        """Placement origin tile (the tile passed to place_flat_ride/place_stall).
+
+        For 1x1 stalls this is the only tile. For larger rides, use get_footprint()
+        with this origin to compute all occupied tiles.
+        """
+        s = self.data.stations[0].start
+        assert s is not None, f"Ride #{self.data.id} has no station start"
+        return Tile.from_world(s.x, s.y)
 
     @property
-    def status(self) -> str:
-        """Ride status: "closed", "open", "testing", or "simulating".
+    def direction(self) -> Direction | None:
+        """Facing direction for stalls, None for rides.
 
-        TODO: Return a StrEnum once codegen Step 3 (enums.json → state.py.j2)
-        maps string state fields to generated enums.
+        Stalls face a specific direction (where guests approach from).
+        Rides don't have a meaningful facing — use entrance.direction / exit.direction instead.
+        Requires a tile lookup for stalls (one round-trip).
         """
-        return self.data.status
+        if self.data.stations[0].entrance is not None:
+            return None
+        td = self._client.world.get_tile(self.placement_tile)
+        track = next(t for t in td.tracks if t.ride == self._id)
+        return Direction(track.direction)
+
+    @property
+    def entrance(self) -> StationAccess | None:
+        """First station's entrance, or None for stalls.
+
+        TODO: direction is the ride's orientation, not the entrance's true facing.
+        Both entrance and exit report the same direction regardless of placement.
+        True facing can be derived from the access tile's position relative to
+        the ride footprint (check which cardinal neighbor has a track element).
+        """
+        e = self.data.stations[0].entrance
+        if e is None:
+            return None
+        return StationAccess(
+            tile=Tile.from_world(e.x, e.y),
+            direction=Direction(e.direction),
+        )
+
+    @property
+    def exit(self) -> StationAccess | None:
+        """First station's exit, or None for stalls.
+
+        TODO: direction is the ride's orientation, not the exit's true facing.
+        See entrance property for details.
+        """
+        e = self.data.stations[0].exit
+        if e is None:
+            return None
+        return StationAccess(
+            tile=Tile.from_world(e.x, e.y),
+            direction=Direction(e.direction),
+        )
 
 
 class RidesProxy:
