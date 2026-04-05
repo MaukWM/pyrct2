@@ -1,14 +1,40 @@
-"""Shared peep (guest/staff) helpers."""
+"""PeepEntity base class and shared peep helpers."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pyrct2._entity import EntityBase
 from pyrct2._generated.enums import PeepPickupType
 from pyrct2.world._tile import TILE_SIZE, Tile
 
 if TYPE_CHECKING:
     from pyrct2.client import RCT2
+
+
+class PeepEntity(EntityBase):
+    """Base for peep entities (guests, staff).
+
+    All peeps have a world position (x, y, z) and can be picked up and moved.
+    """
+
+    @property
+    def tile(self) -> Tile:
+        """Tile this peep is standing on (floored from world coords)."""
+        return Tile.from_world(self.data.x, self.data.y)
+
+    def move_to(self, tile: Tile, height: int | None = None) -> None:
+        """Pick up this peep and place them on the target tile.
+
+        Args:
+            tile: Destination tile.
+            height: Height in land steps. If None, places at surface height.
+
+        Raises:
+            ValueError: If height is below the tile's surface.
+        """
+        z = self._client.world.resolve_height(tile, height)
+        _peep_move(self._client, self._id, tile, z)
 
 
 def _peep_move(client: RCT2, entity_id: int, tile: Tile, z: int) -> None:

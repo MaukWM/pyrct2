@@ -16,8 +16,8 @@ from pyrct2._generated.enums import (
     SelectedLiftAndInverted,
     TrackElemType,
 )
+from pyrct2._entity import EntityBase
 from pyrct2._generated.objects import RIDE_TYPE_TRACK_ELEMS, RideObjectInfo
-from pyrct2._generated.state import Ride
 from pyrct2.result import ActionResult
 from pyrct2.world._tile import TILE_SIZE, Tile
 
@@ -34,23 +34,15 @@ class StationAccess(BaseModel):
     direction: Direction
 
 
-class RideEntity:
+class RideEntity(EntityBase):
     """Wrapper around a Ride snapshot that adds action methods.
 
     All properties are accessible via ``.data`` (the Pydantic model snapshot).
-    Action methods send game commands via the client.
+    Rides are not peeps — they don't have world position or move_to.
     """
-
-    def __init__(self, client: RCT2, model: Ride) -> None:
-        self._client = client
-        self.data = model
 
     def __repr__(self) -> str:
         return f"RideEntity(#{self.data.id} {self.data.name!r} {self.data.status})"
-
-    @property
-    def _id(self) -> int:
-        return self.data.id
 
     # -- Read helpers --
 

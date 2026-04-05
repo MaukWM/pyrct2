@@ -5,9 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from pyrct2._generated.enums import Colour, StaffSetPatrolAreaMode, StaffType
-from pyrct2._generated.state import Staff
+from pyrct2._peep import PeepEntity
 from pyrct2.result import ActionResult
-from pyrct2._peep import _peep_move
 from pyrct2.world import Tile
 
 if TYPE_CHECKING:
@@ -20,38 +19,15 @@ def _validate_rect(start: Tile, end: Tile) -> None:
         raise ValueError(f"start {start} must be <= end {end} (northwest to southeast)")
 
 
-class StaffEntity:
+class StaffEntity(PeepEntity):
     """Wrapper around a Staff snapshot that adds action methods.
 
     All properties are accessible via ``.data`` (the Pydantic model snapshot).
-    Action methods send game commands via the client.
+    Inherits tile and move_to from PeepEntity.
     """
-
-    def __init__(self, client: RCT2, model: Staff) -> None:
-        self._client = client
-        self.data = model
 
     def __repr__(self) -> str:
         return f"StaffEntity({self.data.staffType} #{self.data.id} {self.data.name!r})"
-
-    @property
-    def _id(self) -> int:
-        """Entity ID — always present for live entities from list()/hire().
-
-        The API declares id as int|None because stale JS references to
-        removed entities return null. We only hold live entity snapshots.
-        See: https://github.com/OpenRCT2/OpenRCT2/blob/develop/src/openrct2/scripting/bindings/entity/ScEntity.hpp
-        """
-        if self.data.id is None:
-            raise ValueError("Entity has no ID")
-        return self.data.id
-
-    # -- Read helpers --
-
-    @property
-    def tile(self) -> Tile:
-        """Tile this staff member is standing on (floored from world coords)."""
-        return Tile.from_world(self.data.x, self.data.y)
 
     def refresh(self) -> None:
         """Re-fetch this staff member's state from the game."""
@@ -61,19 +37,6 @@ class StaffEntity:
                 return
 
     # -- Write methods --
-
-    def move_to(self, tile: Tile, height: int | None = None) -> None:
-        """Pick up this staff member and place them on the target tile.
-
-        Args:
-            tile: Destination tile.
-            height: Height in land steps. If None, places at surface height.
-
-        Raises:
-            ValueError: If height is below the tile's surface.
-        """
-        z = self._client.world.resolve_height(tile, height)
-        _peep_move(self._client, self._id, tile, z)
 
     def fire(self) -> ActionResult:
         return ActionResult.from_response(self._client.actions.staff_fire(id=self._id))

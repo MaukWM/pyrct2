@@ -4,37 +4,21 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pyrct2._generated.state import Guest
-from pyrct2._peep import _peep_move
-from pyrct2.world import Tile
+from pyrct2._peep import PeepEntity
 
 if TYPE_CHECKING:
     from pyrct2.client import RCT2
 
 
-class GuestEntity:
+class GuestEntity(PeepEntity):
     """Wrapper around a Guest snapshot.
 
     All properties are accessible via ``.data`` (the Pydantic model snapshot).
+    Inherits tile and move_to from PeepEntity.
     """
-
-    def __init__(self, client: RCT2, model: Guest) -> None:
-        self._client = client
-        self.data = model
 
     def __repr__(self) -> str:
         return f"GuestEntity(#{self.data.id} {self.data.name!r})"
-
-    @property
-    def _id(self) -> int:
-        if self.data.id is None:
-            raise ValueError("Entity has no ID")
-        return self.data.id
-
-    @property
-    def tile(self) -> Tile:
-        """Tile this guest is standing on (floored from world coords)."""
-        return Tile.from_world(self.data.x, self.data.y)
 
     def refresh(self) -> None:
         """Re-fetch this guest's state from the game."""
@@ -42,19 +26,6 @@ class GuestEntity:
             if g.id == self._id:
                 self.data = g
                 return
-
-    def move_to(self, tile: Tile, height: int | None = None) -> None:
-        """Pick up this guest and place them on the target tile.
-
-        Args:
-            tile: Destination tile.
-            height: Height in land steps. If None, places at surface height.
-
-        Raises:
-            ValueError: If height is below the tile's surface.
-        """
-        z = self._client.world.resolve_height(tile, height)
-        _peep_move(self._client, self._id, tile, z)
 
 
 class GuestsProxy:
