@@ -9,6 +9,8 @@ from pydantic import BaseModel, ConfigDict
 from pyrct2._generated.enums import (
     Direction,
     RideInspection,
+    RideModifyType,
+    RideSetSetting,
     RideStatus,
     RideType,
     SelectedLiftAndInverted,
@@ -142,12 +144,40 @@ class RideEntity:
 
     def demolish(self) -> ActionResult:
         """Demolish the ride/stall, removing it from the map."""
-        from pyrct2._generated.enums import RideModifyType
-
         return ActionResult.from_response(
             self._client.actions.ride_demolish(
                 ride=self._id,
                 modify_type=RideModifyType.DEMOLISH,
+            )
+        )
+
+    def set_min_wait_time(self, seconds: int) -> ActionResult:
+        """Set minimum wait time before dispatch (seconds)."""
+        return ActionResult.from_response(
+            self._client.actions.ride_set_setting(
+                ride=self._id,
+                setting=RideSetSetting.MIN_WAITING_TIME,
+                value=seconds,
+            )
+        )
+
+    def set_max_wait_time(self, seconds: int) -> ActionResult:
+        """Set maximum wait time before dispatch (seconds)."""
+        return ActionResult.from_response(
+            self._client.actions.ride_set_setting(
+                ride=self._id,
+                setting=RideSetSetting.MAX_WAITING_TIME,
+                value=seconds,
+            )
+        )
+
+    def set_inspection_interval(self, interval: RideInspection) -> ActionResult:
+        """Set how often mechanics inspect this ride."""
+        return ActionResult.from_response(
+            self._client.actions.ride_set_setting(
+                ride=self._id,
+                setting=RideSetSetting.INSPECTION_INTERVAL,
+                value=interval,
             )
         )
 
@@ -380,8 +410,6 @@ class RidesProxy:
 
     def demolish(self, ride_id: int) -> ActionResult:
         """Demolish a ride, removing it from the map."""
-        from pyrct2._generated.enums import RideModifyType
-
         return ActionResult.from_response(
             self._client.actions.ride_demolish(
                 ride=ride_id,

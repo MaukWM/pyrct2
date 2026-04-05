@@ -2,7 +2,7 @@
 
 import pytest
 
-from pyrct2._generated.enums import Direction
+from pyrct2._generated.enums import Direction, RideInspection
 from pyrct2._generated.objects import RideObjects
 from pyrct2.rides import RideEntity, StationAccess
 from pyrct2.world import Tile
@@ -477,3 +477,41 @@ def test_ride_entity_demolish(game):
 
     ride_2.demolish()
     assert game.rides.list() == []
+
+
+def test_ride_entity_set_wait_times(game):
+    """Set min and max wait times via entity."""
+    game.park.cheats.build_in_pause_mode()
+
+    ride_id = game.rides.place_flat_ride(
+        obj=RideObjects.gentle.MERRY_GO_ROUND,
+        tile=Tile(20, 20),
+        entrance=Tile(20, 22),
+        exit=Tile(20, 18),
+    )
+
+    ride = game.rides.get(ride_id)
+    ride.set_min_wait_time(30)
+    ride.set_max_wait_time(90)
+
+    updated = game.rides.get(ride_id)
+    assert updated.data.minimumWaitingTime == 30
+    assert updated.data.maximumWaitingTime == 90
+
+
+def test_ride_entity_set_inspection_interval(game):
+    """Set inspection interval via entity."""
+    game.park.cheats.build_in_pause_mode()
+
+    ride_id = game.rides.place_flat_ride(
+        obj=RideObjects.gentle.MERRY_GO_ROUND,
+        tile=Tile(20, 20),
+        entrance=Tile(20, 22),
+        exit=Tile(20, 18),
+    )
+
+    ride = game.rides.get(ride_id)
+    ride.set_inspection_interval(RideInspection.EVERY10_MINUTES)
+
+    updated = game.rides.get(ride_id)
+    assert updated.data.inspectionInterval == RideInspection.EVERY10_MINUTES
