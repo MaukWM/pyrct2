@@ -49,3 +49,27 @@ def test_guest_move_to(game_with_guests):
     guest.move_to(Tile(4, 4))
     guest.refresh()
     assert guest.tile == Tile(4, 4)
+
+
+# ── Summary ──────────────────────────────────────────────────────────────────
+
+
+def test_summary_count_matches(game_with_guests):
+    s = game_with_guests.park.guests.summary()
+    assert s.count == game_with_guests.park.guests.count()
+
+
+def test_summary_averages_in_range(game_with_guests):
+    s = game_with_guests.park.guests.summary()
+    for field in ("avg_happiness", "avg_nausea", "avg_hunger", "avg_thirst", "avg_energy", "avg_toilet"):
+        val = getattr(s, field)
+        assert 0 <= val <= 255, f"{field}={val} out of range"
+
+
+def test_summary_empty_park(game):
+    s = game.park.guests.summary()
+    assert s.count == 0
+    assert s.in_park == 0
+    assert s.lost == 0
+    assert s.avg_happiness == 0
+    assert s.thoughts == {}
