@@ -106,7 +106,11 @@ class RideEntity(EntityBase):
         )
 
     def refresh(self) -> None:
-        """Re-fetch this ride's state from the game."""
+        """Re-fetch this ride's state from the game.
+
+        Warning: ride IDs are reused. If this ride was demolished and a new
+        ride received the same ID, this will silently load the wrong data.
+        """
         ride_data = self._client._query("rides", {"id": self._id})
         self.data = Ride.model_validate(ride_data)
 

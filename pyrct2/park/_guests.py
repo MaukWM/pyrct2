@@ -44,7 +44,11 @@ class GuestEntity(PeepEntity):
         return f"GuestEntity(#{self.data.id} {self.data.name!r})"
 
     def refresh(self) -> None:
-        """Re-fetch this guest's state from the game."""
+        """Re-fetch this guest's state from the game.
+
+        Warning: entity IDs are reused. If this guest has left the park and a
+        new guest received the same ID, this will silently load the wrong data.
+        """
         guest_data = self._client._query("guests", {"id": self._id})
         self.data = Guest.model_validate(guest_data)
 

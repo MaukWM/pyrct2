@@ -34,7 +34,11 @@ class StaffEntity(PeepEntity):
         return f"StaffEntity({self.data.staffType} #{self.data.id} {self.data.name!r})"
 
     def refresh(self) -> None:
-        """Re-fetch this staff member's state from the game."""
+        """Re-fetch this staff member's state from the game.
+
+        Warning: entity IDs are reused. If this staff member was fired and a
+        new hire received the same ID, this will silently load the wrong data.
+        """
         staff_data = self._client._query("staff", {"id": self._id})
         adapter: TypeAdapter[Staff] = TypeAdapter(Staff)
         self.data = adapter.validate_python(staff_data)
