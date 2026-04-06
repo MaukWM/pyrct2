@@ -4,8 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pydantic import TypeAdapter
+
 from pyrct2._generated.enums import Colour, StaffSetPatrolAreaMode, StaffType
+from pyrct2._generated.state import Staff
 from pyrct2._peep import PeepEntity
+from pyrct2.errors import QueryError
 from pyrct2.result import ActionResult
 from pyrct2.world import Tile
 
@@ -31,10 +35,9 @@ class StaffEntity(PeepEntity):
 
     def refresh(self) -> None:
         """Re-fetch this staff member's state from the game."""
-        for s in self._client.state.staff():
-            if s.id == self._id:
-                self.data = s
-                return
+        staff_data = self._client._query("staff", {"id": self._id})
+        adapter: TypeAdapter[Staff] = TypeAdapter(Staff)
+        self.data = adapter.validate_python(staff_data)
 
     # -- Write methods --
 
@@ -128,10 +131,15 @@ class StaffProxy:
 
     def get(self, entity_id: int) -> StaffEntity | None:
         """Get a specific staff member by entity ID, or None if not found."""
-        for s in self._client.state.staff():
-            if s.id == entity_id:
-                return StaffEntity(self._client, s)
-        return None
+        try:
+            staff_data = self._client._query("staff", {"id": entity_id})
+        except QueryError as e:
+            if e.error == "not_found":
+                return None
+            raise
+        adapter: TypeAdapter[Staff] = TypeAdapter(Staff)
+        staff = adapter.validate_python(staff_data)
+        return StaffEntity(self._client, staff)
 
     def hire(self, staff_type: StaffType, costume_index: int = 0, staff_orders: int = 0) -> StaffEntity:
         """Hire a new staff member and return the entity.

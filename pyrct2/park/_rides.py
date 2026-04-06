@@ -18,6 +18,8 @@ from pyrct2._generated.enums import (
 )
 from pyrct2._entity import EntityBase
 from pyrct2._generated.objects import RIDE_TYPE_TRACK_ELEMS, RideObjectInfo
+from pyrct2._generated.state import Ride
+from pyrct2.errors import QueryError
 from pyrct2.result import ActionResult
 from pyrct2.world._tile import TILE_SIZE, Tile
 
@@ -105,10 +107,8 @@ class RideEntity(EntityBase):
 
     def refresh(self) -> None:
         """Re-fetch this ride's state from the game."""
-        for r in self._client.state.rides():
-            if r.id == self._id:
-                self.data = r
-                return
+        ride_data = self._client._query("rides", {"id": self._id})
+        self.data = Ride.model_validate(ride_data)
 
     # -- Write methods --
 
@@ -190,10 +190,14 @@ class RidesProxy:
 
     def get(self, ride_id: int) -> RideEntity | None:
         """Get a specific ride by ID, or None if not found."""
-        for r in self._client.state.rides():
-            if r.id == ride_id:
-                return RideEntity(self._client, r)
-        return None
+        try:
+            ride_data = self._client._query("rides", {"id": ride_id})
+        except QueryError as e:
+            if e.error == "not_found":
+                return None
+            raise
+        ride = Ride.model_validate(ride_data)
+        return RideEntity(self._client, ride)
 
     def get_footprint(
         self,

@@ -7,7 +7,9 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
+from pyrct2._generated.state import Guest
 from pyrct2._peep import PeepEntity
+from pyrct2.errors import QueryError
 
 if TYPE_CHECKING:
     from pyrct2.client import RCT2
@@ -43,10 +45,8 @@ class GuestEntity(PeepEntity):
 
     def refresh(self) -> None:
         """Re-fetch this guest's state from the game."""
-        for g in self._client.state.guests():
-            if g.id == self._id:
-                self.data = g
-                return
+        guest_data = self._client._query("guests", {"id": self._id})
+        self.data = Guest.model_validate(guest_data)
 
 
 class GuestsProxy:
@@ -61,10 +61,14 @@ class GuestsProxy:
 
     def get(self, entity_id: int) -> GuestEntity | None:
         """Get a specific guest by entity ID, or None if not found."""
-        for g in self._client.state.guests():
-            if g.id == entity_id:
-                return GuestEntity(self._client, g)
-        return None
+        try:
+            guest_data = self._client._query("guests", {"id": entity_id})
+        except QueryError as e:
+            if e.error == "not_found":
+                return None
+            raise
+        guest = Guest.model_validate(guest_data)
+        return GuestEntity(self._client, guest)
 
     def count(self) -> int:
         """Return the number of guests in the park."""
