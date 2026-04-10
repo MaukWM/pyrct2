@@ -37,6 +37,14 @@ def test_guest_entity_refresh(game_with_guests):
     assert guest.tile == Tile(5, 5)
 
 
+def test_guest_rename(game_with_guests):
+    """Rename a guest."""
+    guest = game_with_guests.park.guests.list()[0]
+    guest.rename("Reimu")
+    guest.refresh()
+    assert guest.data.name == "Reimu"
+
+
 def test_guest_move_to(game_with_guests):
     """Move a guest to different tiles."""
     from pyrct2.world import Tile

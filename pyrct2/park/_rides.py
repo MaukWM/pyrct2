@@ -116,6 +116,15 @@ class RideEntity(EntityBase):
 
     # -- Write methods --
 
+    def rename(self, name: str) -> ActionResult:
+        """Rename the ride/stall."""
+        return ActionResult.from_response(
+            self._client.actions.ride_set_name(
+                ride=self._id,
+                name=name,
+            )
+        )
+
     def set_price(self, price: int) -> ActionResult:
         """Set the ride/stall entry price."""
         return ActionResult.from_response(

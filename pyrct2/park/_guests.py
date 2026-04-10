@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from pyrct2._generated.state import Guest
 from pyrct2._peep import PeepEntity
 from pyrct2.errors import QueryError
+from pyrct2.result import ActionResult
 
 if TYPE_CHECKING:
     from pyrct2.client import RCT2
@@ -42,6 +43,15 @@ class GuestEntity(PeepEntity):
 
     def __repr__(self) -> str:
         return f"GuestEntity(#{self.data.id} {self.data.name!r})"
+
+    def rename(self, name: str) -> ActionResult:
+        """Rename this guest."""
+        return ActionResult.from_response(
+            self._client.actions.guest_set_name(
+                peep=self._id,
+                name=name,
+            )
+        )
 
     def refresh(self) -> None:
         """Re-fetch this guest's state from the game.
