@@ -1,10 +1,24 @@
-"""ObjectsProxy — manage loaded game objects."""
+"""ObjectsProxy — manage loaded game objects.
+
+Also re-exports object catalogs as the public API:
+    from pyrct2.objects import RideObjects, FootpathAdditions, ...
+"""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from pyrct2._generated.objects import RideObjectInfo
+from pyrct2._generated.objects import (  # noqa: F401
+    FootpathAdditionInfo,
+    FootpathAdditions,
+    FootpathRailingsInfo,
+    FootpathRailings,
+    FootpathSurfaceInfo,
+    FootpathSurfaces,
+    ObjectInfo,
+    RideObjectInfo,
+    RideObjects,
+)
 from pyrct2.errors import QueryError
 
 if TYPE_CHECKING:
