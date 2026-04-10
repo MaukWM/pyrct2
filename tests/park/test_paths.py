@@ -4,7 +4,12 @@ import pytest
 
 from pyrct2._generated.enums import Direction, EdgeBit
 from pyrct2.world._slope import SLOPE_E, SLOPE_N, SLOPE_S, SLOPE_W
-from pyrct2._generated.objects import FootpathAdditions, RideObjects
+from pyrct2._generated.objects import (
+    FootpathAdditions,
+    FootpathRailings,
+    FootpathSurfaces,
+    RideObjects,
+)
 from pyrct2.errors import ActionError
 from pyrct2.park._paths import LineResult
 from pyrct2.result import ActionResult
@@ -678,3 +683,58 @@ def test_is_connected_around_obstacle(game):
     game.paths.place_line(Tile(13, 10), Tile(15, 10))  # continue east
 
     assert game.paths.is_connected(Tile(10, 10), Tile(15, 10))
+
+
+# ── Default surface/railings ───────────────────────────────────────
+
+
+def test_set_default_surface(game):
+    """Setting default surface changes what gets placed."""
+    game.park.cheats.build_in_pause_mode()
+
+    game.paths.set_default_surface(FootpathSurfaces.TARMAC)
+    game.paths.place(Tile(10, 10))
+    s1 = game.world.get_tile(Tile(10, 10)).paths[0].surfaceObject
+
+    game.paths.set_default_surface(FootpathSurfaces.CRAZY_PAVING)
+    game.paths.place(Tile(12, 10))
+    s2 = game.world.get_tile(Tile(12, 10)).paths[0].surfaceObject
+
+    assert s1 != s2
+
+
+def test_set_default_queue_surface(game):
+    """Setting default queue surface changes what queue paths use."""
+    game.park.cheats.build_in_pause_mode()
+
+    game.paths.set_default_queue_surface(FootpathSurfaces.QUEUE_BLUE)
+    game.paths.place(Tile(10, 10), queue=True)
+    s1 = game.world.get_tile(Tile(10, 10)).paths[0].surfaceObject
+
+    game.paths.set_default_queue_surface(FootpathSurfaces.QUEUE_RED)
+    game.paths.place(Tile(12, 10), queue=True)
+    s2 = game.world.get_tile(Tile(12, 10)).paths[0].surfaceObject
+
+    assert s1 != s2
+
+
+def test_set_default_railings(game):
+    """Setting default railings changes what gets placed."""
+    game.park.cheats.build_in_pause_mode()
+
+    game.paths.set_default_railings(FootpathRailings.BAMBOO_BLACK)
+    game.paths.place(Tile(10, 10))
+    r1 = game.world.get_tile(Tile(10, 10)).paths[0].railingsObject
+
+    game.paths.set_default_railings(FootpathRailings.WOOD)
+    game.paths.place(Tile(12, 10))
+    r2 = game.world.get_tile(Tile(12, 10)).paths[0].railingsObject
+
+    assert r1 != r2
+
+
+def test_set_default_surface_not_loaded(game):
+    """Setting a default to an unloaded surface raises RuntimeError."""
+    game.park.cheats.build_in_pause_mode()
+    with pytest.raises(RuntimeError, match="not loaded"):
+        game.paths.set_default_surface(FootpathSurfaces.ROAD)

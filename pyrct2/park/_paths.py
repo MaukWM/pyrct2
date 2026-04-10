@@ -154,6 +154,33 @@ class PathsProxy:
         self._default_queue_surface = _first_surface_index(client, queue=True)
         self._default_railings = _first_railings_index(client)
 
+    def set_default_surface(self, surface: FootpathSurfaceInfo) -> None:
+        """Set the default surface for new paths.
+
+        Raises RuntimeError if the surface is not loaded in this scenario.
+        """
+        self._default_surface = _resolve_object_index(
+            self._client, "footpath_surface", surface.identifier,
+        )
+
+    def set_default_queue_surface(self, surface: FootpathSurfaceInfo) -> None:
+        """Set the default surface for new queue paths.
+
+        Raises RuntimeError if the surface is not loaded in this scenario.
+        """
+        self._default_queue_surface = _resolve_object_index(
+            self._client, "footpath_surface", surface.identifier,
+        )
+
+    def set_default_railings(self, railings: FootpathRailingsInfo) -> None:
+        """Set the default railings for new paths.
+
+        Raises RuntimeError if the railings are not loaded in this scenario.
+        """
+        self._default_railings = _resolve_object_index(
+            self._client, "footpath_railings", railings.identifier,
+        )
+
     def _resolve_surface(self, surface: FootpathSurfaceInfo | None, *, queue: bool = False) -> int:
         if surface is None:
             return self._default_queue_surface if queue else self._default_surface
