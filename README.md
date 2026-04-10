@@ -30,6 +30,7 @@ with RCT2.connect() as game:
     print(game.park.name)
 ```
 
+
 ## Building a park
 
 ```python
@@ -43,58 +44,50 @@ with RCT2.launch(Scenario.CRAZY_CASTLE) as game:
     game.park.cheats.build_in_pause_mode()
     game.park.finance.set_entrance_fee(10)
 
-    # -- Terrain --
-    game.world.raise_land_smooth(Tile(25, 20), Tile(27, 20))
-
-    # -- Place a flat ride --
+    # -- Place a flat ride south of the main path --
     ride = game.rides.place_flat_ride(
         obj=RideObjects.gentle.MERRY_GO_ROUND,
-        tile=Tile(20, 20),
-        entrance=Tile(22, 21),
-        exit=Tile(22, 19),
+        tile=Tile(44, 34),
+        entrance=Tile(44, 32),
+        exit=Tile(46, 34),
         direction=Direction.NORTH,
     )
     ride.set_price(30)
     ride.open()
 
-    # -- Place some stalls --
-    burger = game.rides.place_stall(RideObjects.stall.BURGER_BAR, Tile(18, 22))
+    # -- Place some stalls along the main path --
+    burger = game.rides.place_stall(RideObjects.stall.BURGER_BAR, Tile(42, 29))
     burger.open()
-
-    drink = game.rides.place_stall(RideObjects.stall.DRINKS_STALL, Tile(18, 24))
+    drink = game.rides.place_stall(RideObjects.stall.DRINKS_STALL, Tile(46, 29))
     drink.open()
 
     # -- Paths --
-    game.paths.place_line(Tile(15, 20), Tile(22, 20))       # main path to ride
-    game.paths.place_line(Tile(18, 20), Tile(18, 25))       # branch to stalls
-    game.paths.place_line(Tile(22, 20), Tile(28, 20))       # auto-slopes over hill
-    game.paths.place_line(Tile(20, 19), Tile(22, 19), queue=True)  # queue to entrance
+    game.paths.place_line(Tile(44, 30), Tile(44, 31))           # branch to ride
+    game.paths.place(Tile(44, 31), queue=True)                   # queue to entrance
+    game.paths.place_line(Tile(46, 30), Tile(46, 34))            # exit path back
 
     # path additions
-    game.paths.place_addition(Tile(16, 20), FootpathAdditions.LAMP1)
-    game.paths.place_addition(Tile(19, 20), FootpathAdditions.BENCH1)
-    game.paths.place_addition(Tile(17, 20), FootpathAdditions.LITTER1)
+    game.paths.place_addition(Tile(43, 30), FootpathAdditions.LAMP1)
+    game.paths.place_addition(Tile(45, 30), FootpathAdditions.BENCH1)
+    game.paths.place_addition(Tile(47, 30), FootpathAdditions.LITTER1)
 
-    # verify connectivity
-    assert game.paths.is_connected(Tile(15, 20), Tile(28, 20))
+    # verify connectivity from entrance to ride
+    assert game.paths.is_connected(Tile(48, 30), Tile(44, 31))
 
     # -- Staff --
-    handyman = game.staff.hire(StaffType.HANDYMAN)
-    handyman.set_patrol_area(Tile(14, 18), Tile(24, 26))
-    game.staff.hire(StaffType.MECHANIC)
+    handyman = game.park.staff.hire(StaffType.HANDYMAN)
+    handyman.set_patrol_area(Tile(40, 28), Tile(50, 36))
+    game.park.staff.hire(StaffType.MECHANIC)
 
-    # -- Run the park --
-    game.advance_ticks(1000)
+    # -- Let it run --
+    game.park.cheats.generate_guests(50)
+    game.advance_ticks(100)
 
     # -- Read state --
-    print(f"Rating: {game.park.rating}, Guests: {game.park.guests.count}")
+    print(f"Rating: {game.park.rating}, Guests: {game.park.guests.count()}")
     print(f"Cash: {game.state.park().cash}")
-
     for r in game.state.rides():
         print(f"  {r.name}: {r.status}, excitement {r.excitement}")
-
-    tile = game.world.get_tile(Tile(20, 20))
-    print(f"  Tile (20,20): {len(tile.tracks)} tracks, {len(tile.paths)} paths")
 ```
 
 ## Raw API
