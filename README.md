@@ -18,7 +18,7 @@ from pyrct2.client import RCT2
 from pyrct2.scenarios import Scenario
 
 # Launch a built-in scenario
-with RCT2.launch(Scenario.CRAZY_CASTLE) as game:
+with RCT2.launch(Scenario.TEST_PARK) as game:
     print(f"{game.park.name}: rating {game.park.rating}, cash ${game.park.finance.cash}")
 
 # Or load a scenario/save by path
@@ -36,13 +36,16 @@ with RCT2.connect() as game:
 ```python
 from pyrct2.client import RCT2
 from pyrct2.enums import Direction, StaffType
-from pyrct2.objects import RideObjects, FootpathAdditions
+from pyrct2.objects import RideObjects, FootpathAdditions, FootpathSurfaces, FootpathRailings
 from pyrct2.scenarios import Scenario
 from pyrct2.world import Tile
 
-with RCT2.launch(Scenario.CRAZY_CASTLE) as game:
+with RCT2.launch(Scenario.CRAZY_CASTLE, headless=False) as game:
     game.park.cheats.build_in_pause_mode()
     game.park.finance.set_entrance_fee(10)
+
+    # -- Match the scenario's path style --
+    game.paths.set_default_surface(FootpathSurfaces.TARMAC)
 
     # -- Place a flat ride south of the main path --
     ride = game.rides.place_flat_ride(
@@ -79,7 +82,8 @@ with RCT2.launch(Scenario.CRAZY_CASTLE) as game:
     handyman.set_patrol_area(Tile(40, 28), Tile(50, 36))
     game.park.staff.hire(StaffType.MECHANIC)
 
-    # -- Let it run --
+    # -- Open the park and let it run --
+    game.park.open()
     game.park.cheats.generate_guests(50)
     game.advance_ticks(100)
 
