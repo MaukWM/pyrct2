@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from pyrct2._generated.enums import (
+    Direction,
     FootpathSlopeType,
     INVALID_DIRECTION,
     PathConstructFlags,
@@ -17,17 +18,14 @@ if TYPE_CHECKING:
     from pyrct2.client import RCT2
 
 
-def _resolve_footpath_index(
-    client: RCT2, obj_type: str, identifier: str
-) -> int:
+def _resolve_footpath_index(client: RCT2, obj_type: str, identifier: str) -> int:
     """Resolve a footpath object identifier to its loaded slot index."""
     objects = client._query("get_objects", {"type": obj_type})
     for o in objects:
         if o["identifier"] == identifier:
             return o["index"]
     raise RuntimeError(
-        f"{identifier} is not loaded in this scenario. "
-        f"Loaded {obj_type}: {[o['identifier'] for o in objects]}"
+        f"{identifier} is not loaded in this scenario. Loaded {obj_type}: {[o['identifier'] for o in objects]}"
     )
 
 
@@ -58,14 +56,18 @@ class PathsProxy:
         if surface is None:
             return self._default_surface
         return _resolve_footpath_index(
-            self._client, "footpath_surface", surface.identifier,
+            self._client,
+            "footpath_surface",
+            surface.identifier,
         )
 
     def _resolve_railings(self, railings: FootpathRailingsInfo | None) -> int:
         if railings is None:
             return self._default_railings
         return _resolve_footpath_index(
-            self._client, "footpath_railings", railings.identifier,
+            self._client,
+            "footpath_railings",
+            railings.identifier,
         )
 
     def place(
@@ -99,7 +101,7 @@ class PathsProxy:
                 railings_object=self._resolve_railings(railings),
                 direction=INVALID_DIRECTION,
                 slope_type=FootpathSlopeType.FLAT,
-                slope_direction=0,
+                slope_direction=Direction(0),
                 construct_flags=flags,
             )
         )
