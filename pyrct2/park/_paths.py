@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from pyrct2._generated.enums import (
     Direction,
+    EdgeBit,
     FootpathSlopeType,
     INVALID_DIRECTION,
     PathConstructFlags,
@@ -48,7 +49,9 @@ class LineResult:
         """Sum of costs for successful placements."""
         return sum(r.cost for r in self.results if isinstance(r, ActionResult))
 
+
 if TYPE_CHECKING:
+    from pyrct2._generated.state import FootpathElement
     from pyrct2.client import RCT2
 
 # Terrain slope bitmask → (FootpathSlopeType, slopeDirection) mapping.
@@ -75,6 +78,44 @@ _TERRAIN_TO_PATH_SLOPE: list[tuple[FootpathSlopeType, int]] = [
     (FootpathSlopeType.RAISE, 0),  # 14: E+S+W
     (FootpathSlopeType.IRREGULAR, 0),  # 15: all corners
 ]
+
+
+# Edge traversal: (edge_bit, dx, dy, opposite_edge_bit).
+_EDGE_NEIGHBORS: list[tuple[int, int, int, int]] = [
+    (EdgeBit.WEST, -1, 0, EdgeBit.EAST),
+    (EdgeBit.SOUTH, 0, 1, EdgeBit.NORTH),
+    (EdgeBit.EAST, 1, 0, EdgeBit.WEST),
+    (EdgeBit.NORTH, 0, -1, EdgeBit.SOUTH),
+]
+
+# Direction → EdgeBit for determining slope high-end edge.
+_DIR_TO_EDGE: dict[int, int] = {
+    Direction.WEST: EdgeBit.WEST,
+    Direction.NORTH: EdgeBit.NORTH,
+    Direction.EAST: EdgeBit.EAST,
+    Direction.SOUTH: EdgeBit.SOUTH,
+}
+
+
+def _edge_z(path: FootpathElement, edge_bit: int) -> int:
+    """Z-height at a specific edge of a path element.
+
+    Flat paths connect at baseZ on all edges. Sloped paths connect at
+    baseZ on the low end and baseZ + LAND_HEIGHT_STEP on the high end.
+    """
+    if path.slopeDirection is None:
+        return path.baseZ
+    high_edge = _DIR_TO_EDGE[int(path.slopeDirection)]
+    if edge_bit == high_edge:
+        return path.baseZ + LAND_HEIGHT_STEP
+    return path.baseZ
+
+
+def _path_reachable_at(path: FootpathElement, z: int) -> bool:
+    """Whether a path element can be reached at z-height."""
+    if path.slopeDirection is None:
+        return z == path.baseZ
+    return z == path.baseZ or z == path.baseZ + LAND_HEIGHT_STEP
 
 
 def _resolve_object_index(client: RCT2, obj_type: str, identifier: str) -> int:
@@ -242,10 +283,7 @@ class PathsProxy:
         dx = to_tile.x - from_tile.x
         dy = to_tile.y - from_tile.y
         if dx != 0 and dy != 0:
-            raise ValueError(
-                f"place_line requires a cardinal line (same x or same y), "
-                f"got {from_tile} → {to_tile}"
-            )
+            raise ValueError(f"place_line requires a cardinal line (same x or same y), got {from_tile} → {to_tile}")
 
         # Build tile list
         if dx != 0:
@@ -266,6 +304,103 @@ class PathsProxy:
                 results.append(e)
 
         return LineResult(results=results)
+
+    def is_connected(
+        self,
+        from_tile: Tile,
+        to_tile: Tile,
+        *,
+        from_height: int | None = None,
+        to_height: int | None = None,
+    ) -> bool:
+        """Check if paths at two tiles are connected by walking edges.
+
+        BFS over path edge bitmasks, respecting z-levels. Paths at
+        different heights are not connected unless linked by slopes.
+        Returns False if either tile has no path.
+
+        Args:
+            from_tile: Starting tile.
+            to_tile: Destination tile.
+            from_height: Height in land steps at the starting tile.
+                Required if the tile has multiple paths (stacked).
+            to_height: Height in land steps at the destination tile.
+                Required if the tile has multiple paths (stacked).
+
+        Raises:
+            ValueError: If a tile has multiple paths and the corresponding
+                height is not specified.
+        """
+        from collections import deque
+
+        all_paths = self._client.world.get_paths()
+
+        from_paths = all_paths.get((from_tile.x, from_tile.y), [])
+        to_paths = all_paths.get((to_tile.x, to_tile.y), [])
+        if not from_paths or not to_paths:
+            return False
+
+        if len(from_paths) > 1 and from_height is None:
+            raise ValueError(
+                f"{from_tile} has {len(from_paths)} paths at different heights — specify from_height to disambiguate"
+            )
+        if len(to_paths) > 1 and to_height is None:
+            raise ValueError(
+                f"{to_tile} has {len(to_paths)} paths at different heights — specify to_height to disambiguate"
+            )
+
+        # Filter to the specified path when height is given
+        if from_height is not None:
+            from_z = from_height * LAND_HEIGHT_STEP
+            from_paths = [p for p in from_paths if _path_reachable_at(p, from_z)]
+            if not from_paths:
+                return False
+        if to_height is not None:
+            to_z = to_height * LAND_HEIGHT_STEP
+            to_paths = [p for p in to_paths if _path_reachable_at(p, to_z)]
+            if not to_paths:
+                return False
+
+        # Trivial: same tile, same path
+        if from_tile == to_tile:
+            return True
+
+        # Target z-values
+        target_zs: set[int] = set()
+        for p in to_paths:
+            target_zs.add(p.baseZ)
+            if p.slopeDirection is not None:
+                target_zs.add(p.baseZ + LAND_HEIGHT_STEP)
+
+        # Seed BFS from paths at from_tile
+        start: set[tuple[int, int, int]] = set()
+        for p in from_paths:
+            start.add((from_tile.x, from_tile.y, p.baseZ))
+            if p.slopeDirection is not None:
+                start.add((from_tile.x, from_tile.y, p.baseZ + LAND_HEIGHT_STEP))
+
+        visited: set[tuple[int, int, int]] = set(start)
+        queue: deque[tuple[int, int, int]] = deque(start)
+
+        while queue:
+            x, y, z = queue.popleft()
+
+            for path_elem in all_paths.get((x, y), []):
+                if not _path_reachable_at(path_elem, z):
+                    continue
+                for edge_bit, dx, dy, _opp in _EDGE_NEIGHBORS:
+                    if not (path_elem.edges & edge_bit):
+                        continue
+                    nz = _edge_z(path_elem, edge_bit)
+                    nx, ny = x + dx, y + dy
+                    node = (nx, ny, nz)
+                    if nx == to_tile.x and ny == to_tile.y and nz in target_zs:
+                        return True
+                    if node not in visited:
+                        visited.add(node)
+                        queue.append(node)
+
+        return False
 
     def remove(
         self,

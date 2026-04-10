@@ -522,3 +522,159 @@ def test_place_line_queue(game):
 
     for x in range(10, 13):
         assert game.world.get_tile(Tile(x, 10)).paths[0].isQueue is True
+
+
+# ── Connectivity ────────────────────────────────────────────────────
+
+
+def test_is_connected_line(game):
+    """Straight line of paths is connected end-to-end."""
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place_line(Tile(10, 10), Tile(15, 10))
+
+    assert game.paths.is_connected(Tile(10, 10), Tile(15, 10))
+    assert game.paths.is_connected(Tile(15, 10), Tile(10, 10))  # reverse
+
+
+def test_is_connected_same_tile(game):
+    """A tile is trivially connected to itself."""
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place(Tile(10, 10))
+    assert game.paths.is_connected(Tile(10, 10), Tile(10, 10))
+
+
+def test_is_connected_no_path(game):
+    """No path at either tile → not connected."""
+    game.park.cheats.build_in_pause_mode()
+    assert not game.paths.is_connected(Tile(10, 10), Tile(12, 10))
+
+    # One has path, other doesn't
+    game.paths.place(Tile(10, 10))
+    assert not game.paths.is_connected(Tile(10, 10), Tile(12, 10))
+    assert not game.paths.is_connected(Tile(12, 10), Tile(10, 10))
+
+
+def test_is_connected_disconnected(game):
+    """Two isolated paths are not connected."""
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place(Tile(10, 10))
+    game.paths.place(Tile(20, 20))
+
+    assert not game.paths.is_connected(Tile(10, 10), Tile(20, 20))
+
+
+def test_is_connected_gap(game):
+    """Line with a gap in the middle is not connected across the gap."""
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place_line(Tile(10, 10), Tile(12, 10))
+    # Skip tile 13
+    game.paths.place_line(Tile(14, 10), Tile(16, 10))
+
+    assert game.paths.is_connected(Tile(10, 10), Tile(12, 10))
+    assert game.paths.is_connected(Tile(14, 10), Tile(16, 10))
+    assert not game.paths.is_connected(Tile(10, 10), Tile(16, 10))
+
+
+def test_is_connected_via_slope(game):
+    """flat → slope → flat(higher) are connected."""
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place(Tile(10, 10))  # flat at ground
+    game.paths.place(Tile(11, 10), slope=Direction.EAST)  # slope rising east
+    game.paths.place(Tile(12, 10), height=8)  # flat one step higher
+
+    assert game.paths.is_connected(Tile(10, 10), Tile(12, 10))
+    assert game.paths.is_connected(Tile(12, 10), Tile(10, 10))
+
+
+def test_is_connected_staircase(game):
+    """Multiple slopes forming a staircase are connected end-to-end."""
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place(Tile(10, 10))  # flat at ground
+    for i in range(3):
+        game.paths.place(Tile(11 + i, 10), slope=Direction.EAST, height=7 + i)
+    game.paths.place(Tile(14, 10), height=10)  # flat at top
+
+    assert game.paths.is_connected(Tile(10, 10), Tile(14, 10))
+
+
+def test_is_connected_broken_staircase(game):
+    """Staircase with a missing middle slope is not connected."""
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place(Tile(10, 10))  # flat at ground
+    game.paths.place(Tile(11, 10), slope=Direction.EAST)  # slope 1
+    # Skip tile 12 (missing slope)
+    game.paths.place(Tile(13, 10), slope=Direction.EAST, height=9)  # slope 3
+    game.paths.place(Tile(14, 10), height=10)  # flat at top
+
+    assert game.paths.is_connected(Tile(10, 10), Tile(11, 10))
+    assert not game.paths.is_connected(Tile(10, 10), Tile(14, 10))
+
+
+def test_is_connected_elevated_not_ground(game):
+    """Elevated path directly above ground path — must specify height."""
+    game.park.cheats.build_in_pause_mode()
+    # Ground path + elevated on same tiles
+    game.paths.place(Tile(10, 10))
+    game.paths.place(Tile(10, 10), height=9)
+    game.paths.place(Tile(11, 10))
+    game.paths.place(Tile(11, 10), height=9)
+
+    assert len(game.world.get_tile(Tile(10, 10)).paths) == 2
+
+    # Ambiguous — must raise ValueError
+    with pytest.raises(ValueError, match="from_height"):
+        game.paths.is_connected(Tile(10, 10), Tile(11, 10))
+
+    # Ground connected to ground
+    assert game.paths.is_connected(Tile(10, 10), Tile(11, 10), from_height=7, to_height=7)
+    # Elevated connected to elevated
+    assert game.paths.is_connected(Tile(10, 10), Tile(11, 10), from_height=9, to_height=9)
+    # Ground NOT connected to elevated
+    assert not game.paths.is_connected(Tile(10, 10), Tile(11, 10), from_height=7, to_height=9)
+
+
+def test_is_connected_elevated_line(game):
+    """Elevated paths in the air are connected to each other."""
+    game.park.cheats.build_in_pause_mode()
+    for x in range(10, 15):
+        game.paths.place(Tile(x, 10), height=9)
+
+    assert game.paths.is_connected(Tile(10, 10), Tile(14, 10))
+
+
+def test_is_connected_l_shape(game):
+    """L-shaped path (turn) is connected corner-to-end."""
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place_line(Tile(10, 10), Tile(14, 10))  # horizontal
+    game.paths.place_line(Tile(14, 10), Tile(14, 14))  # vertical (shares corner)
+
+    assert game.paths.is_connected(Tile(10, 10), Tile(14, 14))
+
+
+def test_is_connected_queue_to_normal(game):
+    """Queue and normal paths connect to each other."""
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place(Tile(10, 10))
+    game.paths.place(Tile(11, 10), queue=True)
+    game.paths.place(Tile(12, 10))
+
+    assert game.paths.is_connected(Tile(10, 10), Tile(12, 10))
+
+
+def test_is_connected_around_obstacle(game):
+    """Path routing around a blocked tile is connected."""
+    game.park.cheats.build_in_pause_mode()
+    # Place a stall at (12, 10)
+    game.rides.place_stall(
+        obj=RideObjects.stall.BALLOON_STALL,
+        tile=Tile(12, 10),
+        direction=Direction.NORTH,
+    )
+    # Route around: east, south, east, north, east
+    game.paths.place_line(Tile(10, 10), Tile(11, 10))  # before obstacle
+    game.paths.place_line(Tile(11, 10), Tile(11, 11))  # go south
+    game.paths.place_line(Tile(11, 11), Tile(13, 11))  # go east past obstacle
+    game.paths.place_line(Tile(13, 11), Tile(13, 10))  # go north
+    game.paths.place_line(Tile(13, 10), Tile(15, 10))  # continue east
+
+    assert game.paths.is_connected(Tile(10, 10), Tile(15, 10))

@@ -123,6 +123,20 @@ class WorldProxy:
             for t in raw_tiles
         ]
 
+    def get_paths(self) -> dict[tuple[int, int], list[FootpathElement]]:
+        """Fetch all footpath elements on the map.
+
+        Returns a dict keyed by ``(tile_x, tile_y)`` → list of path elements.
+        Only tiles that have paths are included.
+        """
+        raw_paths = self._client._query("get_paths")
+        result: dict[tuple[int, int], list[FootpathElement]] = {}
+        for p in raw_paths:
+            elem = FootpathElement.model_validate(p)
+            key = (p["tileX"], p["tileY"])
+            result.setdefault(key, []).append(elem)
+        return result
+
     def max_corner_height(self, from_tile: Tile, to_tile: Tile) -> int:
         """Highest corner height (land steps) across a rectangular region."""
         tiles = self.get_tiles(from_tile, to_tile)
