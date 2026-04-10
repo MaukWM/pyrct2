@@ -160,7 +160,9 @@ class PathsProxy:
         Raises RuntimeError if the surface is not loaded in this scenario.
         """
         self._default_surface = _resolve_object_index(
-            self._client, "footpath_surface", surface.identifier,
+            self._client,
+            "footpath_surface",
+            surface.identifier,
         )
 
     def set_default_queue_surface(self, surface: FootpathSurfaceInfo) -> None:
@@ -169,7 +171,9 @@ class PathsProxy:
         Raises RuntimeError if the surface is not loaded in this scenario.
         """
         self._default_queue_surface = _resolve_object_index(
-            self._client, "footpath_surface", surface.identifier,
+            self._client,
+            "footpath_surface",
+            surface.identifier,
         )
 
     def set_default_railings(self, railings: FootpathRailingsInfo) -> None:
@@ -178,7 +182,9 @@ class PathsProxy:
         Raises RuntimeError if the railings are not loaded in this scenario.
         """
         self._default_railings = _resolve_object_index(
-            self._client, "footpath_railings", railings.identifier,
+            self._client,
+            "footpath_railings",
+            railings.identifier,
         )
 
     def _resolve_surface(self, surface: FootpathSurfaceInfo | None, *, queue: bool = False) -> int:
