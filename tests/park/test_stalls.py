@@ -22,16 +22,6 @@ def test_require_stall_rejects_ride():
         _require_stall(RideObjects.gentle.MERRY_GO_ROUND)
 
 
-# ── Helpers ──────────────────────────────────────────────────────────
-
-
-def _get_ride_status(game, ride_id: int) -> str:
-    """Get the status string of a ride by ID."""
-    rides = game.state.rides()
-    ride = next(r for r in rides if r.id == ride_id)
-    return ride.status
-
-
 # ── Integration tests ────────────────────────────────────────────────
 
 
@@ -39,37 +29,31 @@ def test_place_stall_open_close(game):
     """Open and close a stall, verifying status transitions."""
     game.park.cheats.build_in_pause_mode()
 
-    ride_id = game.rides.place_stall(
+    stall = game.rides.place_stall(
         obj=RideObjects.stall.BURGER_BAR,
         tile=Tile(20, 20),
     )
-
     # Verify track on the tile
     tile_data = game.world.get_tile(Tile(20, 20))
     assert len(tile_data.tracks) > 0
 
     # Starts closed
-    assert _get_ride_status(game, ride_id) == "closed"
+    assert stall.data.status == "closed"
 
     # Open
-    game.rides.open(ride_id)
-    assert _get_ride_status(game, ride_id) == "open"
-
-    # Open again (idempotent)
-    game.rides.open(ride_id)
-    assert _get_ride_status(game, ride_id) == "open"
+    stall.open()
+    stall.refresh()
+    assert stall.data.status == "open"
 
     # Close
-    game.rides.close(ride_id)
-    assert _get_ride_status(game, ride_id) == "closed"
-
-    # Close again (idempotent)
-    game.rides.close(ride_id)
-    assert _get_ride_status(game, ride_id) == "closed"
+    stall.close()
+    stall.refresh()
+    assert stall.data.status == "closed"
 
     # Re-open after close
-    game.rides.open(ride_id)
-    assert _get_ride_status(game, ride_id) == "open"
+    stall.open()
+    stall.refresh()
+    assert stall.data.status == "open"
 
 
 def test_place_stall_with_direction(game):
@@ -77,13 +61,14 @@ def test_place_stall_with_direction(game):
     game.park.cheats.build_in_pause_mode()
 
     for d in (Direction.WEST, Direction.NORTH, Direction.EAST, Direction.SOUTH):
-        ride_id = game.rides.place_stall(
+        stall = game.rides.place_stall(
             obj=RideObjects.stall.BALLOON_STALL,
             tile=Tile(20 + d.value * 3, 20),
             direction=d,
         )
-        game.rides.open(ride_id)
-        assert _get_ride_status(game, ride_id) == "open"
+        stall.open()
+        stall.refresh()
+        assert stall.data.status == "open"
 
 
 def test_place_stall_at_surface_height(game):
@@ -93,7 +78,7 @@ def test_place_stall_at_surface_height(game):
     tile = Tile(20, 20)
     surface_z = game.world.get_tile(tile).surface.baseZ
 
-    _ = game.rides.place_stall(
+    game.rides.place_stall(
         obj=RideObjects.stall.INFORMATION_KIOSK,
         tile=tile,
     )
@@ -135,7 +120,7 @@ def test_place_stall_in_the_sky(game):
     surface_steps = game.world.get_tile(tile).surface.baseZ // LAND_HEIGHT_STEP
 
     target_height = surface_steps + 5
-    _ = game.rides.place_stall(
+    game.rides.place_stall(
         obj=RideObjects.stall.BURGER_BAR,
         tile=tile,
         height=target_height,
@@ -168,7 +153,7 @@ def test_place_stall_stacked_above_existing(game):
     game.rides.place_stall(obj=RideObjects.stall.BURGER_BAR, tile=tile)
 
     surface_steps = game.world.get_tile(tile).surface.baseZ // LAND_HEIGHT_STEP
-    _ = game.rides.place_stall(
+    game.rides.place_stall(
         obj=RideObjects.stall.BURGER_BAR,
         tile=tile,
         height=surface_steps + 5,

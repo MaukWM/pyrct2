@@ -159,7 +159,7 @@ class StaffProxy:
             staff_orders=staff_orders,
         )
         peep_id = resp["payload"]["peep"]
-        for s in self._client.state.staff():
-            if s.id == peep_id:
-                return StaffEntity(self._client, s)
-        raise RuntimeError(f"Hired staff (peep={peep_id}) not found in entity list")
+        staff = self.get(peep_id)
+        if staff is None:
+            raise RuntimeError(f"Hired staff (peep={peep_id}) not found after hiring")
+        return staff

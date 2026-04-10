@@ -239,7 +239,7 @@ class RidesProxy:
         exit: Tile,
         height: int | None = None,
         direction: Direction = Direction.NORTH,
-    ) -> int:
+    ) -> RideEntity:
         """Place a flat ride or stall with entrance and exit.
 
         The meaning of ``tile`` depends on the ride's footprint size — see
@@ -259,7 +259,7 @@ class RidesProxy:
             direction: Facing direction of the ride. Defaults to NORTH.
 
         Returns:
-            The ride ID (int) for use with open(), demolish(), etc.
+            The placed ride as a :class:`RideEntity`.
 
         Raises:
             RuntimeError: If the ride object is not loaded in the scenario.
@@ -317,7 +317,10 @@ class RidesProxy:
             is_exit=True,
         )
 
-        return ride_id
+        ride = self.get(ride_id)
+        if ride is None:
+            raise RuntimeError(f"Placed ride (id={ride_id}) not found after creation")
+        return ride
 
     def place_stall(
         self,
@@ -325,7 +328,7 @@ class RidesProxy:
         tile: Tile,
         height: int | None = None,
         direction: Direction = Direction.NORTH,
-    ) -> int:
+    ) -> RideEntity:
         """Place a stall (shop, food stand, restroom, etc.).
 
         Stalls are 1x1 rides that don't need entrance or exit. The direction
@@ -338,7 +341,7 @@ class RidesProxy:
             direction: Facing direction. Defaults to NORTH.
 
         Returns:
-            The ride ID (int) for use with open(), demolish(), etc.
+            The placed stall as a :class:`RideEntity`.
 
         Raises:
             ValueError: If the object is not a stall, or height is below surface.
@@ -347,7 +350,10 @@ class RidesProxy:
         """
         _require_stall(obj)
         ride_id, _ = self._create_ride(obj, tile, height, direction)
-        return ride_id
+        ride = self.get(ride_id)
+        if ride is None:
+            raise RuntimeError(f"Placed stall (id={ride_id}) not found after creation")
+        return ride
 
     def _create_ride(
         self,
@@ -395,33 +401,6 @@ class RidesProxy:
         )
 
         return ride_id, ride_type
-
-    def open(self, ride_id: int) -> ActionResult:
-        """Open a ride for guests."""
-        return ActionResult.from_response(
-            self._client.actions.ride_set_status(
-                ride=ride_id,
-                status=RideStatus.OPEN,
-            )
-        )
-
-    def close(self, ride_id: int) -> ActionResult:
-        """Close a ride."""
-        return ActionResult.from_response(
-            self._client.actions.ride_set_status(
-                ride=ride_id,
-                status=RideStatus.CLOSED,
-            )
-        )
-
-    def demolish(self, ride_id: int) -> ActionResult:
-        """Demolish a ride, removing it from the map."""
-        return ActionResult.from_response(
-            self._client.actions.ride_demolish(
-                ride=ride_id,
-                modify_type=RideModifyType.DEMOLISH,
-            )
-        )
 
     def list(self) -> list[RideEntity]:
         """Return all rides as entity wrappers."""

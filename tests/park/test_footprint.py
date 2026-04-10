@@ -58,10 +58,10 @@ def _place_and_check(game, obj, direction):
 
     category = obj.category if isinstance(obj.category, str) else obj.category[0]
     if category == "stall":
-        ride_id = game.rides.place_stall(obj=obj, tile=CENTER, direction=direction)
+        ride = game.rides.place_stall(obj=obj, tile=CENTER, direction=direction)
     else:
         entrance, exit_tile = _pick_entrance_exit(computed)
-        ride_id = game.rides.place_flat_ride(
+        ride = game.rides.place_flat_ride(
             obj=obj,
             tile=CENTER,
             entrance=entrance,
@@ -69,8 +69,8 @@ def _place_and_check(game, obj, direction):
             direction=direction,
         )
 
-    actual = _actual_footprint(game, ride_id)
-    game.rides.demolish(ride_id)
+    actual = _actual_footprint(game, ride.data.id)
+    ride.demolish()
 
     assert actual == computed, (
         f"{obj.name} direction={direction.name}: "

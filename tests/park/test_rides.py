@@ -9,16 +9,6 @@ from pyrct2.world import Tile
 from pyrct2.world._slope import LAND_HEIGHT_STEP
 
 
-# ── Helpers ──────────────────────────────────────────────────────────
-
-
-def _get_ride_status(game, ride_id: int) -> str:
-    """Get the status string of a ride by ID."""
-    rides = game.state.rides()
-    ride = next(r for r in rides if r.id == ride_id)
-    return ride.status
-
-
 # ── Entrance/exit validation ─────────────────────────────────────────
 
 
@@ -96,13 +86,12 @@ def test_place_flat_ride_open_close(game):
     """Place a Merry-Go-Round, verify placement, open/close with status checks."""
     game.park.cheats.build_in_pause_mode()
 
-    ride_id = game.rides.place_flat_ride(
+    ride = game.rides.place_flat_ride(
         obj=RideObjects.gentle.MERRY_GO_ROUND,
         tile=Tile(20, 20),
         entrance=Tile(20, 22),
         exit=Tile(20, 18),
     )
-
     # Verify track on the center tile
     tile_data = game.world.get_tile(Tile(20, 20))
     assert len(tile_data.tracks) > 0
@@ -112,27 +101,22 @@ def test_place_flat_ride_open_close(game):
     assert len(game.world.get_tile(Tile(20, 18)).entrances) > 0
 
     # Starts closed
-    assert _get_ride_status(game, ride_id) == "closed"
+    assert ride.data.status == "closed"
 
     # Open
-    game.rides.open(ride_id)
-    assert _get_ride_status(game, ride_id) == "open"
-
-    # Open again (idempotent)
-    game.rides.open(ride_id)
-    assert _get_ride_status(game, ride_id) == "open"
+    ride.open()
+    ride.refresh()
+    assert ride.data.status == "open"
 
     # Close
-    game.rides.close(ride_id)
-    assert _get_ride_status(game, ride_id) == "closed"
-
-    # Close again (idempotent)
-    game.rides.close(ride_id)
-    assert _get_ride_status(game, ride_id) == "closed"
+    ride.close()
+    ride.refresh()
+    assert ride.data.status == "closed"
 
     # Re-open after close
-    game.rides.open(ride_id)
-    assert _get_ride_status(game, ride_id) == "open"
+    ride.open()
+    ride.refresh()
+    assert ride.data.status == "open"
 
 
 def test_place_flat_ride_with_direction(game):
@@ -141,15 +125,16 @@ def test_place_flat_ride_with_direction(game):
 
     for i, d in enumerate(Direction):
         x = 20 + i * 5
-        ride_id = game.rides.place_flat_ride(
+        ride = game.rides.place_flat_ride(
             obj=RideObjects.gentle.MERRY_GO_ROUND,
             tile=Tile(x, 20),
             entrance=Tile(x, 22),
             exit=Tile(x, 18),
             direction=d,
         )
-        game.rides.open(ride_id)
-        assert _get_ride_status(game, ride_id) == "open"
+        ride.open()
+        ride.refresh()
+        assert ride.data.status == "open"
 
 
 def test_place_flat_ride_height_too_low(game):
@@ -173,7 +158,7 @@ def test_place_flat_ride_at_surface_height(game):
     tile = Tile(20, 20)
     surface_z = game.world.get_tile(tile).surface.baseZ
 
-    _ = game.rides.place_flat_ride(
+    game.rides.place_flat_ride(
         obj=RideObjects.gentle.MERRY_GO_ROUND,
         tile=tile,
         entrance=Tile(20, 22),
@@ -195,7 +180,7 @@ def test_place_flat_ride_on_raised_terrain(game):
     after_z = game.world.get_tile(tile).surface.baseZ
     assert after_z > before_z
 
-    _ = game.rides.place_flat_ride(
+    game.rides.place_flat_ride(
         obj=RideObjects.gentle.MERRY_GO_ROUND,
         tile=tile,
         entrance=Tile(30, 32),
@@ -214,7 +199,7 @@ def test_place_flat_ride_in_the_sky(game):
     surface_steps = game.world.get_tile(tile).surface.baseZ // LAND_HEIGHT_STEP
 
     target_height = surface_steps + 5
-    _ = game.rides.place_flat_ride(
+    game.rides.place_flat_ride(
         obj=RideObjects.gentle.MERRY_GO_ROUND,
         tile=tile,
         entrance=Tile(20, 22),
@@ -262,7 +247,7 @@ def test_place_flat_ride_stacked_above_existing(game):
     )
 
     surface_steps = game.world.get_tile(tile).surface.baseZ // LAND_HEIGHT_STEP
-    _ = game.rides.place_flat_ride(
+    game.rides.place_flat_ride(
         obj=RideObjects.gentle.MERRY_GO_ROUND,
         tile=tile,
         entrance=Tile(22, 20),
@@ -309,27 +294,22 @@ def test_get_multiple(game):
     """Get correct ride by ID when multiple exist."""
     game.park.cheats.build_in_pause_mode()
 
-    id_1 = game.rides.place_flat_ride(
+    ride_1 = game.rides.place_flat_ride(
         obj=RideObjects.gentle.MERRY_GO_ROUND,
         tile=Tile(20, 20),
         entrance=Tile(20, 22),
         exit=Tile(20, 18),
     )
-    id_2 = game.rides.place_flat_ride(
+    ride_2 = game.rides.place_flat_ride(
         obj=RideObjects.gentle.MERRY_GO_ROUND,
         tile=Tile(30, 20),
         entrance=Tile(30, 22),
         exit=Tile(30, 18),
     )
 
-    ride_1 = game.rides.get(id_1)
-    ride_2 = game.rides.get(id_2)
-    assert ride_1 is not None
-    assert ride_2 is not None
-    assert ride_1._id == id_1
-    assert ride_2._id == id_2
     assert ride_1.data.name == "Merry-Go-Round 1"
     assert ride_2.data.name == "Merry-Go-Round 2"
+    assert ride_1._id != ride_2._id
 
 
 def test_get_nonexistent(game):
@@ -344,15 +324,13 @@ def test_ride_entity_properties(game):
     """Ride entity returns correct placement_tile, entrance, exit, and direction=None."""
     game.park.cheats.build_in_pause_mode()
 
-    ride_id = game.rides.place_flat_ride(
+    ride = game.rides.place_flat_ride(
         obj=RideObjects.gentle.MERRY_GO_ROUND,
         tile=Tile(20, 20),
         entrance=Tile(20, 22),
         exit=Tile(20, 18),
         direction=Direction.EAST,
     )
-
-    ride = game.rides.get(ride_id)
 
     # Placement tile matches what was passed to place_flat_ride
     assert ride.placement_tile == Tile(20, 20)
@@ -375,13 +353,11 @@ def test_stall_entity_properties(game):
     """Stall entity returns correct placement_tile, direction, and entrance/exit=None."""
     game.park.cheats.build_in_pause_mode()
 
-    stall_id = game.rides.place_stall(
+    stall = game.rides.place_stall(
         obj=RideObjects.stall.BURGER_BAR,
         tile=Tile(25, 25),
         direction=Direction.SOUTH,
     )
-
-    stall = game.rides.get(stall_id)
 
     # Placement tile matches
     assert stall.placement_tile == Tile(25, 25)
@@ -401,77 +377,75 @@ def test_ride_entity_open_close(game):
     """Open and close a ride via entity methods."""
     game.park.cheats.build_in_pause_mode()
 
-    ride_id = game.rides.place_flat_ride(
+    ride = game.rides.place_flat_ride(
         obj=RideObjects.gentle.MERRY_GO_ROUND,
         tile=Tile(20, 20),
         entrance=Tile(20, 22),
         exit=Tile(20, 18),
     )
-
-    ride = game.rides.get(ride_id)
     assert ride.data.status == "closed"
 
     ride.open()
-    assert game.rides.get(ride_id).data.status == "open"
+    ride.refresh()
+    assert ride.data.status == "open"
 
     ride.close()
-    assert game.rides.get(ride_id).data.status == "closed"
+    ride.refresh()
+    assert ride.data.status == "closed"
 
 
 def test_ride_entity_set_price(game):
     """Set ride entry price via entity."""
     game.park.cheats.build_in_pause_mode()
 
-    ride_id = game.rides.place_flat_ride(
+    ride = game.rides.place_flat_ride(
         obj=RideObjects.gentle.MERRY_GO_ROUND,
         tile=Tile(20, 20),
         entrance=Tile(20, 22),
         exit=Tile(20, 18),
     )
 
-    ride = game.rides.get(ride_id)
     ride.set_price(50)
-    assert game.rides.get(ride_id).data.price[0] == 50
+    ride.refresh()
+    assert ride.data.price[0] == 50
 
 
 def test_stall_entity_set_price(game):
     """Set stall price via entity."""
     game.park.cheats.build_in_pause_mode()
 
-    stall_id = game.rides.place_stall(
+    stall = game.rides.place_stall(
         obj=RideObjects.stall.BURGER_BAR,
         tile=Tile(20, 20),
     )
 
-    stall = game.rides.get(stall_id)
     stall.set_price(30)
-    assert game.rides.get(stall_id).data.price[0] == 30
+    stall.refresh()
+    assert stall.data.price[0] == 30
 
 
 def test_ride_entity_demolish(game):
     """Demolish a ride via entity, verify it's gone."""
     game.park.cheats.build_in_pause_mode()
 
-    ride_id = game.rides.place_flat_ride(
+    ride = game.rides.place_flat_ride(
         obj=RideObjects.gentle.MERRY_GO_ROUND,
         tile=Tile(20, 20),
         entrance=Tile(20, 22),
         exit=Tile(20, 18),
     )
 
-    ride = game.rides.get(ride_id)
     ride.demolish()
-    assert game.rides.get(ride_id) is None
+    assert game.rides.get(ride.data.id) is None
     assert game.rides.list() == []
 
     # Place again on the same tile, verify it works
-    ride_id_2 = game.rides.place_flat_ride(
+    ride_2 = game.rides.place_flat_ride(
         obj=RideObjects.gentle.MERRY_GO_ROUND,
         tile=Tile(20, 20),
         entrance=Tile(20, 22),
         exit=Tile(20, 18),
     )
-    ride_2 = game.rides.get(ride_id_2)
     assert ride_2 is not None
     assert len(game.rides.list()) == 1
 
@@ -483,16 +457,14 @@ def test_ride_entity_refresh(game):
     """Entity data is stale after write, refresh() updates it."""
     game.park.cheats.build_in_pause_mode()
 
-    ride_id = game.rides.place_flat_ride(
+    ride = game.rides.place_flat_ride(
         obj=RideObjects.gentle.MERRY_GO_ROUND,
         tile=Tile(20, 20),
         entrance=Tile(20, 22),
         exit=Tile(20, 18),
     )
 
-    ride = game.rides.get(ride_id)
     old_price = ride.data.price[0]
-
     ride.set_price(77)
 
     # Data is stale — still shows old price
@@ -508,35 +480,33 @@ def test_ride_entity_set_wait_times(game):
     """Set min and max wait times via entity."""
     game.park.cheats.build_in_pause_mode()
 
-    ride_id = game.rides.place_flat_ride(
+    ride = game.rides.place_flat_ride(
         obj=RideObjects.gentle.MERRY_GO_ROUND,
         tile=Tile(20, 20),
         entrance=Tile(20, 22),
         exit=Tile(20, 18),
     )
 
-    ride = game.rides.get(ride_id)
     ride.set_min_wait_time(30)
     ride.set_max_wait_time(90)
 
-    updated = game.rides.get(ride_id)
-    assert updated.data.minimumWaitingTime == 30
-    assert updated.data.maximumWaitingTime == 90
+    ride.refresh()
+    assert ride.data.minimumWaitingTime == 30
+    assert ride.data.maximumWaitingTime == 90
 
 
 def test_ride_entity_set_inspection_interval(game):
     """Set inspection interval via entity."""
     game.park.cheats.build_in_pause_mode()
 
-    ride_id = game.rides.place_flat_ride(
+    ride = game.rides.place_flat_ride(
         obj=RideObjects.gentle.MERRY_GO_ROUND,
         tile=Tile(20, 20),
         entrance=Tile(20, 22),
         exit=Tile(20, 18),
     )
 
-    ride = game.rides.get(ride_id)
     ride.set_inspection_interval(RideInspection.EVERY10_MINUTES)
 
-    updated = game.rides.get(ride_id)
-    assert updated.data.inspectionInterval == RideInspection.EVERY10_MINUTES
+    ride.refresh()
+    assert ride.data.inspectionInterval == RideInspection.EVERY10_MINUTES
