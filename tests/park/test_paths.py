@@ -108,3 +108,49 @@ def test_place_path_idempotent(game):
     assert r1.cost > 0
     r2 = game.paths.place(Tile(10, 10))
     assert r2.cost == 0
+
+
+# ── Removal ──────────────────────────────────────────────────────────
+
+
+def test_remove_path(game):
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place(Tile(10, 10))
+    assert len(game.world.get_tile(Tile(10, 10)).paths) == 1
+
+    game.paths.remove(Tile(10, 10))
+    assert len(game.world.get_tile(Tile(10, 10)).paths) == 0
+
+
+def test_remove_path_no_path(game):
+    """Removing where there's no path raises ActionError."""
+    game.park.cheats.build_in_pause_mode()
+    with pytest.raises(ActionError):
+        game.paths.remove(Tile(10, 10))
+
+
+def test_remove_path_at_height(game):
+    """Remove an elevated path, leaving ground-level path intact."""
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place(Tile(10, 10))
+    # Ground is at 7 land steps (z=112), clearance at 9. Place above clearance.
+    game.paths.place(Tile(10, 10), height=9)
+    assert len(game.world.get_tile(Tile(10, 10)).paths) == 2
+
+    game.paths.remove(Tile(10, 10), height=9)
+    paths = game.world.get_tile(Tile(10, 10)).paths
+    assert len(paths) == 1
+    assert paths[0].baseZ == game.world.get_tile(Tile(10, 10)).surface.baseZ
+
+
+def test_remove_path_ground_keeps_elevated(game):
+    """Removing without height removes ground-level path, keeps elevated."""
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place(Tile(10, 10))
+    game.paths.place(Tile(10, 10), height=9)
+    assert len(game.world.get_tile(Tile(10, 10)).paths) == 2
+
+    game.paths.remove(Tile(10, 10))
+    paths = game.world.get_tile(Tile(10, 10)).paths
+    assert len(paths) == 1
+    assert paths[0].baseZ > game.world.get_tile(Tile(10, 10)).surface.baseZ

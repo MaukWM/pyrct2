@@ -1,4 +1,4 @@
-"""PathsProxy — footpath placement."""
+"""PathsProxy — footpath placement and removal."""
 
 from __future__ import annotations
 
@@ -101,5 +101,26 @@ class PathsProxy:
                 slope_type=FootpathSlopeType.FLAT,
                 slope_direction=0,
                 construct_flags=flags,
+            )
+        )
+
+    def remove(
+        self,
+        tile: Tile,
+        *,
+        height: int | None = None,
+    ) -> ActionResult:
+        """Remove a footpath.
+
+        Args:
+            tile: Which tile to remove the path from.
+            height: Height in land steps. None = ground level.
+        """
+        z = self._client.world.resolve_height(tile, height)
+        return ActionResult.from_response(
+            self._client.actions.footpath_remove(
+                x=tile.x * TILE_SIZE,
+                y=tile.y * TILE_SIZE,
+                z=z,
             )
         )
