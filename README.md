@@ -18,7 +18,7 @@ from pyrct2.client import RCT2
 from pyrct2.scenarios import Scenario
 
 # Launch a built-in scenario
-with RCT2.launch(Scenario.TEST_PARK) as game:
+with RCT2.launch(Scenario.CRAZY_CASTLE) as game:
     print(f"{game.park.name}: rating {game.park.rating}, cash ${game.park.finance.cash}")
 
 # Or load a scenario/save by path
@@ -40,7 +40,7 @@ from pyrct2.objects import RideObjects, FootpathAdditions, FootpathSurfaces, Foo
 from pyrct2.scenarios import Scenario
 from pyrct2.world import Tile
 
-with RCT2.launch(Scenario.CRAZY_CASTLE, headless=False) as game:
+with RCT2.launch(Scenario.TEST_PARK, headless=False) as game:
     game.park.cheats.build_in_pause_mode()
     game.park.finance.set_entrance_fee(10)
 
