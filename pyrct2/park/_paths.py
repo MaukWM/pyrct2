@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from pyrct2._generated.enums import (
@@ -15,9 +16,37 @@ from pyrct2._generated.objects import (
     FootpathRailingsInfo,
     FootpathSurfaceInfo,
 )
+from pyrct2.errors import ActionError
 from pyrct2.result import ActionResult
 from pyrct2.world._slope import LAND_HEIGHT_STEP
 from pyrct2.world._tile import TILE_SIZE, Tile
+
+
+@dataclass(frozen=True)
+class LineResult:
+    """Result of placing a line of paths.
+
+    ``results`` contains one entry per tile in order. Each entry is either
+    an :class:`ActionResult` (success) or an :class:`ActionError` (failure).
+    Failed tiles do not stop placement — all tiles are attempted.
+    """
+
+    results: list[ActionResult | ActionError] = field(default_factory=list)
+
+    @property
+    def succeeded(self) -> int:
+        """Number of tiles placed successfully."""
+        return sum(1 for r in self.results if isinstance(r, ActionResult))
+
+    @property
+    def failed(self) -> int:
+        """Number of tiles that failed."""
+        return sum(1 for r in self.results if isinstance(r, ActionError))
+
+    @property
+    def total_cost(self) -> int:
+        """Sum of costs for successful placements."""
+        return sum(r.cost for r in self.results if isinstance(r, ActionResult))
 
 if TYPE_CHECKING:
     from pyrct2.client import RCT2
@@ -181,6 +210,62 @@ class PathsProxy:
                 construct_flags=flags,
             )
         )
+
+    def place_line(
+        self,
+        from_tile: Tile,
+        to_tile: Tile,
+        *,
+        queue: bool = False,
+        surface: FootpathSurfaceInfo | None = None,
+        railings: FootpathRailingsInfo | None = None,
+    ) -> LineResult:
+        """Place paths in a straight cardinal line (best-effort).
+
+        Places a path on every tile from ``from_tile`` to ``to_tile``
+        inclusive. The line must be horizontal or vertical (same x or same y).
+        Each tile uses terrain-aware auto-placement.
+
+        Obstacles don't stop placement — every tile is attempted. Check
+        :attr:`LineResult.failed` and inspect individual results for errors.
+
+        Args:
+            from_tile: Starting tile.
+            to_tile: Ending tile (inclusive).
+            queue: If True, place queue paths.
+            surface: Footpath surface. None = scenario default.
+            railings: Footpath railings. None = scenario default.
+
+        Raises:
+            ValueError: If the line is not cardinal (diagonal).
+        """
+        dx = to_tile.x - from_tile.x
+        dy = to_tile.y - from_tile.y
+        if dx != 0 and dy != 0:
+            raise ValueError(
+                f"place_line requires a cardinal line (same x or same y), "
+                f"got {from_tile} → {to_tile}"
+            )
+
+        # Build tile list
+        if dx != 0:
+            step = 1 if dx > 0 else -1
+            tiles = [Tile(x, from_tile.y) for x in range(from_tile.x, to_tile.x + step, step)]
+        elif dy != 0:
+            step = 1 if dy > 0 else -1
+            tiles = [Tile(from_tile.x, y) for y in range(from_tile.y, to_tile.y + step, step)]
+        else:
+            tiles = [from_tile]
+
+        results: list[ActionResult | ActionError] = []
+        for tile in tiles:
+            try:
+                r = self.place(tile, queue=queue, surface=surface, railings=railings)
+                results.append(r)
+            except ActionError as e:
+                results.append(e)
+
+        return LineResult(results=results)
 
     def remove(
         self,

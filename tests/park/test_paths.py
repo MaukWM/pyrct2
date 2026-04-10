@@ -6,6 +6,8 @@ from pyrct2._generated.enums import Direction, EdgeBit
 from pyrct2.world._slope import SLOPE_E, SLOPE_N, SLOPE_S, SLOPE_W
 from pyrct2._generated.objects import FootpathAdditions, RideObjects
 from pyrct2.errors import ActionError
+from pyrct2.park._paths import LineResult
+from pyrct2.result import ActionResult
 from pyrct2.world._tile import Tile
 
 
@@ -383,3 +385,140 @@ def test_place_addition_no_path(game):
     game.park.cheats.build_in_pause_mode()
     with pytest.raises(ActionError):
         game.paths.place_addition(Tile(30, 30), FootpathAdditions.LAMP1)
+
+
+# ── Line placement ──────────────────────────────────────────────────
+
+
+def test_place_line_horizontal(game):
+    """Place a horizontal line of paths."""
+    game.park.cheats.build_in_pause_mode()
+    result = game.paths.place_line(Tile(10, 10), Tile(14, 10))
+
+    assert isinstance(result, LineResult)
+    assert result.succeeded == 5
+    assert result.failed == 0
+    assert result.total_cost > 0
+
+    # All tiles should have paths
+    for x in range(10, 15):
+        assert len(game.world.get_tile(Tile(x, 10)).paths) == 1
+
+
+def test_place_line_vertical(game):
+    """Place a vertical line of paths."""
+    game.park.cheats.build_in_pause_mode()
+    result = game.paths.place_line(Tile(10, 10), Tile(10, 14))
+
+    assert result.succeeded == 5
+    assert result.failed == 0
+
+    for y in range(10, 15):
+        assert len(game.world.get_tile(Tile(10, y)).paths) == 1
+
+
+def test_place_line_reverse(game):
+    """Line works regardless of from→to direction."""
+    game.park.cheats.build_in_pause_mode()
+    result = game.paths.place_line(Tile(14, 10), Tile(10, 10))
+
+    assert result.succeeded == 5
+    for x in range(10, 15):
+        assert len(game.world.get_tile(Tile(x, 10)).paths) == 1
+
+
+def test_place_line_single_tile(game):
+    """Line from a tile to itself places one path."""
+    game.park.cheats.build_in_pause_mode()
+    result = game.paths.place_line(Tile(10, 10), Tile(10, 10))
+
+    assert result.succeeded == 1
+    assert len(result.results) == 1
+
+
+def test_place_line_diagonal_raises(game):
+    """Diagonal lines are rejected."""
+    game.park.cheats.build_in_pause_mode()
+    with pytest.raises(ValueError, match="cardinal"):
+        game.paths.place_line(Tile(10, 10), Tile(12, 12))
+
+
+def test_place_line_auto_connects(game):
+    """Paths in a line auto-connect along the axis."""
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place_line(Tile(10, 10), Tile(13, 10))
+
+    # Middle tiles should have edges in both directions
+    middle = game.world.get_tile(Tile(11, 10)).paths[0]
+    assert middle.edges & EdgeBit.WEST
+    assert middle.edges & EdgeBit.EAST
+
+
+def test_place_line_idempotent(game):
+    """Placing a line over existing paths is a no-op (cost=0 per tile)."""
+    game.park.cheats.build_in_pause_mode()
+    r1 = game.paths.place_line(Tile(10, 10), Tile(14, 10))
+    assert r1.total_cost > 0
+
+    r2 = game.paths.place_line(Tile(10, 10), Tile(14, 10))
+    assert r2.succeeded == 5
+    assert r2.total_cost == 0
+
+
+def test_place_line_on_sloped_terrain(game):
+    """Line over sloped terrain auto-detects slopes."""
+    game.park.cheats.build_in_pause_mode()
+    ground = game.world.get_tile(Tile(10, 10)).surface.baseZ // 16
+
+    # Create a slope: N+E raised on tile (11, 10) → path slopes EAST
+    game.world.set_height(Tile(11, 10), ground, slope=SLOPE_N | SLOPE_E)
+
+    game.paths.place_line(Tile(10, 10), Tile(12, 10))
+
+    flat_before = game.world.get_tile(Tile(10, 10)).paths[0]
+    sloped = game.world.get_tile(Tile(11, 10)).paths[0]
+    flat_after = game.world.get_tile(Tile(12, 10)).paths[0]
+
+    assert flat_before.slopeDirection is None
+    assert sloped.slopeDirection == Direction.EAST
+    assert flat_after.slopeDirection is None
+
+
+def test_place_line_best_effort_through_ride(game):
+    """Line continues past a blocked tile and reports per-tile results."""
+    game.park.cheats.build_in_pause_mode()
+
+    # Place a stall at tile (12, 10) to block the middle of a line
+    game.rides.place_stall(
+        obj=RideObjects.stall.BALLOON_STALL,
+        tile=Tile(12, 10),
+        direction=Direction.NORTH,
+    )
+
+    result = game.paths.place_line(Tile(10, 10), Tile(14, 10))
+
+    # 5 tiles total, 1 blocked → 4 succeed, 1 fails
+    assert len(result.results) == 5
+    assert result.succeeded == 4
+    assert result.failed == 1
+
+    # The blocked tile is index 2 (tile 12)
+    assert isinstance(result.results[2], ActionError)
+
+    # Other tiles are ActionResult
+    for i in [0, 1, 3, 4]:
+        assert isinstance(result.results[i], ActionResult)
+
+    # Paths exist on non-blocked tiles
+    for x in [10, 11, 13, 14]:
+        assert len(game.world.get_tile(Tile(x, 10)).paths) == 1
+    assert len(game.world.get_tile(Tile(12, 10)).paths) == 0
+
+
+def test_place_line_queue(game):
+    """Line placement respects the queue flag."""
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place_line(Tile(10, 10), Tile(12, 10), queue=True)
+
+    for x in range(10, 13):
+        assert game.world.get_tile(Tile(x, 10)).paths[0].isQueue is True
