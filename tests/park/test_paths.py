@@ -3,6 +3,7 @@
 import pytest
 
 from pyrct2._generated.enums import Direction, EdgeBit
+from pyrct2.world._slope import SLOPE_E, SLOPE_N, SLOPE_S, SLOPE_W
 from pyrct2._generated.objects import FootpathAdditions, RideObjects
 from pyrct2.errors import ActionError
 from pyrct2.world._tile import Tile
@@ -177,9 +178,9 @@ def test_slope_auto_connects_flat_to_flat(game):
     The flat path east of the slope is one land step higher.
     """
     game.park.cheats.build_in_pause_mode()
-    game.paths.place(Tile(10, 10))                          # flat (low side)
-    game.paths.place(Tile(11, 10), slope=Direction.EAST)    # slope rising east
-    game.paths.place(Tile(12, 10), height=8)                # flat (high side, +1 step)
+    game.paths.place(Tile(10, 10))  # flat (low side)
+    game.paths.place(Tile(11, 10), slope=Direction.EAST)  # slope rising east
+    game.paths.place(Tile(12, 10), height=8)  # flat (high side, +1 step)
 
     low = game.world.get_tile(Tile(10, 10)).paths[0]
     slope = game.world.get_tile(Tile(11, 10)).paths[0]
@@ -194,8 +195,8 @@ def test_slope_auto_connects_flat_to_flat(game):
 def test_slope_no_perpendicular_connection(game):
     """Slopes don't connect sideways — only along their axis."""
     game.park.cheats.build_in_pause_mode()
-    game.paths.place(Tile(10, 10), slope=Direction.EAST)    # slope east
-    game.paths.place(Tile(10, 11))                          # flat south
+    game.paths.place(Tile(10, 10), slope=Direction.EAST)  # slope east
+    game.paths.place(Tile(10, 11))  # flat south
 
     slope = game.world.get_tile(Tile(10, 10)).paths[0]
     flat = game.world.get_tile(Tile(10, 11)).paths[0]
@@ -235,6 +236,65 @@ def test_slope_queue(game):
     path = game.world.get_tile(Tile(10, 10)).paths[0]
     assert path.isQueue is True
     assert path.slopeDirection == Direction.EAST
+
+
+# ── Terrain-aware placement ──────────────────────────────────────────
+
+# Terrain slope bitmask: N=1, E=2, S=4, W=8
+
+
+def test_place_terrain_two_adjacent_corners(game):
+    """Two adjacent raised corners → sloped path in the right direction."""
+    game.park.cheats.build_in_pause_mode()
+    ground = game.world.get_tile(Tile(10, 10)).surface.baseZ // 16
+
+    # N+E raised → path slopes EAST
+    game.world.set_height(Tile(10, 10), ground, slope=SLOPE_N | SLOPE_E)
+    game.paths.place(Tile(10, 10))
+    assert game.world.get_tile(Tile(10, 10)).paths[0].slopeDirection == Direction.EAST
+
+    # E+S raised → path slopes SOUTH
+    game.world.set_height(Tile(12, 10), ground, slope=SLOPE_E | SLOPE_S)
+    game.paths.place(Tile(12, 10))
+    assert game.world.get_tile(Tile(12, 10)).paths[0].slopeDirection == Direction.SOUTH
+
+    # N+W raised → path slopes NORTH
+    game.world.set_height(Tile(14, 10), ground, slope=SLOPE_N | SLOPE_W)
+    game.paths.place(Tile(14, 10))
+    assert game.world.get_tile(Tile(14, 10)).paths[0].slopeDirection == Direction.NORTH
+
+    # S+W raised → path slopes WEST
+    game.world.set_height(Tile(16, 10), ground, slope=SLOPE_S | SLOPE_W)
+    game.paths.place(Tile(16, 10))
+    assert game.world.get_tile(Tile(16, 10)).paths[0].slopeDirection == Direction.WEST
+
+
+def test_place_terrain_three_corners(game):
+    """Three raised corners → flat path one step higher."""
+    game.park.cheats.build_in_pause_mode()
+    ground = game.world.get_tile(Tile(10, 10)).surface.baseZ // 16
+
+    game.world.set_height(Tile(10, 10), ground, slope=SLOPE_N | SLOPE_E | SLOPE_S)
+    game.paths.place(Tile(10, 10))
+    path = game.world.get_tile(Tile(10, 10)).paths[0]
+    assert path.slopeDirection is None  # flat
+    assert path.baseZ == (ground + 1) * 16  # one step higher
+
+
+def test_place_terrain_irregular_fails(game):
+    """Single corner or opposite corners → game rejects with ActionError."""
+    game.park.cheats.build_in_pause_mode()
+    ground = game.world.get_tile(Tile(10, 10)).surface.baseZ // 16
+
+    # N only → irregular
+    game.world.set_height(Tile(10, 10), ground, slope=SLOPE_N)
+    with pytest.raises(ActionError):
+        game.paths.place(Tile(10, 10))
+
+    # N+S (opposite corners) → irregular
+    game.world.set_height(Tile(12, 10), ground, slope=SLOPE_N | SLOPE_S)
+    with pytest.raises(ActionError):
+        game.paths.place(Tile(12, 10))
 
 
 # ── Additions ────────────────────────────────────────────────────────
