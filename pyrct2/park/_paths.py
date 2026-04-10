@@ -10,7 +10,11 @@ from pyrct2._generated.enums import (
     INVALID_DIRECTION,
     PathConstructFlags,
 )
-from pyrct2._generated.objects import FootpathRailingsInfo, FootpathSurfaceInfo
+from pyrct2._generated.objects import (
+    FootpathAdditionInfo,
+    FootpathRailingsInfo,
+    FootpathSurfaceInfo,
+)
 from pyrct2.result import ActionResult
 from pyrct2.world._tile import TILE_SIZE, Tile
 
@@ -18,7 +22,7 @@ if TYPE_CHECKING:
     from pyrct2.client import RCT2
 
 
-def _resolve_footpath_index(client: RCT2, obj_type: str, identifier: str) -> int:
+def _resolve_object_index(client: RCT2, obj_type: str, identifier: str) -> int:
     """Resolve a footpath object identifier to its loaded slot index."""
     objects = client._query("get_objects", {"type": obj_type})
     for o in objects:
@@ -57,7 +61,7 @@ class PathsProxy:
     def _resolve_surface(self, surface: FootpathSurfaceInfo | None, *, queue: bool = False) -> int:
         if surface is None:
             return self._default_queue_surface if queue else self._default_surface
-        return _resolve_footpath_index(
+        return _resolve_object_index(
             self._client,
             "footpath_surface",
             surface.identifier,
@@ -66,7 +70,7 @@ class PathsProxy:
     def _resolve_railings(self, railings: FootpathRailingsInfo | None) -> int:
         if railings is None:
             return self._default_railings
-        return _resolve_footpath_index(
+        return _resolve_object_index(
             self._client,
             "footpath_railings",
             railings.identifier,
@@ -139,6 +143,54 @@ class PathsProxy:
         z = self._client.world.resolve_height(tile, height)
         return ActionResult.from_response(
             self._client.actions.footpath_remove(
+                x=tile.x * TILE_SIZE,
+                y=tile.y * TILE_SIZE,
+                z=z,
+            )
+        )
+
+    def place_addition(
+        self,
+        tile: Tile,
+        addition: FootpathAdditionInfo,
+        *,
+        height: int | None = None,
+    ) -> ActionResult:
+        """Place a path addition (bench, lamp, bin, etc.) on an existing path.
+
+        Args:
+            tile: Tile with an existing path.
+            addition: Which addition to place.
+            height: Height in land steps. None = ground level.
+        """
+        z = self._client.world.resolve_height(tile, height)
+        obj_index = _resolve_object_index(
+            self._client, "footpath_addition", addition.identifier,
+        )
+        return ActionResult.from_response(
+            self._client.actions.footpath_addition_place(
+                x=tile.x * TILE_SIZE,
+                y=tile.y * TILE_SIZE,
+                z=z,
+                object=obj_index,
+            )
+        )
+
+    def remove_addition(
+        self,
+        tile: Tile,
+        *,
+        height: int | None = None,
+    ) -> ActionResult:
+        """Remove a path addition from an existing path.
+
+        Args:
+            tile: Tile with a path that has an addition.
+            height: Height in land steps. None = ground level.
+        """
+        z = self._client.world.resolve_height(tile, height)
+        return ActionResult.from_response(
+            self._client.actions.footpath_addition_remove(
                 x=tile.x * TILE_SIZE,
                 y=tile.y * TILE_SIZE,
                 z=z,

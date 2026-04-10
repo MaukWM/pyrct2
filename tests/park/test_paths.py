@@ -3,7 +3,7 @@
 import pytest
 
 from pyrct2._generated.enums import Direction, EdgeBit
-from pyrct2._generated.objects import RideObjects
+from pyrct2._generated.objects import FootpathAdditions, RideObjects
 from pyrct2.errors import ActionError
 from pyrct2.world._tile import Tile
 
@@ -235,3 +235,91 @@ def test_slope_queue(game):
     path = game.world.get_tile(Tile(10, 10)).paths[0]
     assert path.isQueue is True
     assert path.slopeDirection == Direction.EAST
+
+
+# ── Additions ────────────────────────────────────────────────────────
+
+# Additions loaded in test_scenario.park that can go on regular (non-queue) paths.
+_REGULAR_ADDITIONS = [
+    FootpathAdditions.BENCHLOG,
+    FootpathAdditions.BENCH1,
+    FootpathAdditions.JUMPFNT1,
+    FootpathAdditions.JUMPSNW1,
+    FootpathAdditions.LAMP1,
+    FootpathAdditions.LAMP2,
+    FootpathAdditions.LITTER1,
+]
+
+
+def _assert_addition_is(game, tile, expected):
+    """Verify the addition on a path matches the expected object."""
+    path = game.world.get_tile(tile).paths[0]
+    additions = game._query("get_objects", {"type": "footpath_addition"})
+    placed_id = next(a["identifier"] for a in additions if a["index"] == path.addition)
+    assert placed_id == expected.identifier
+
+
+@pytest.mark.parametrize("addition", _REGULAR_ADDITIONS, ids=lambda a: a.identifier.split(".")[-1])
+def test_place_addition_on_flat(game, addition):
+    """Every regular addition can be placed on a flat path."""
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place(Tile(10, 10))
+    game.paths.place_addition(Tile(10, 10), addition)
+    _assert_addition_is(game, Tile(10, 10), addition)
+
+
+@pytest.mark.parametrize("addition", _REGULAR_ADDITIONS, ids=lambda a: a.identifier.split(".")[-1])
+def test_place_addition_on_slope(game, addition):
+    """Additions with is_allowed_on_slope succeed, others fail."""
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place(Tile(10, 10), slope=Direction.EAST)
+    if addition.is_allowed_on_slope:
+        game.paths.place_addition(Tile(10, 10), addition)
+        _assert_addition_is(game, Tile(10, 10), addition)
+    else:
+        with pytest.raises(ActionError):
+            game.paths.place_addition(Tile(10, 10), addition)
+
+
+def test_place_addition_on_queue(game):
+    """Lamp and queue TV work on queues; bench does not."""
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place(Tile(10, 10), queue=True)
+    game.paths.place_addition(Tile(10, 10), FootpathAdditions.LAMP1)
+    _assert_addition_is(game, Tile(10, 10), FootpathAdditions.LAMP1)
+
+    game.paths.place(Tile(12, 10), queue=True)
+    game.paths.place_addition(Tile(12, 10), FootpathAdditions.QTV1)
+    _assert_addition_is(game, Tile(12, 10), FootpathAdditions.QTV1)
+
+    game.paths.place(Tile(14, 10), queue=True)
+    with pytest.raises(ActionError):
+        game.paths.place_addition(Tile(14, 10), FootpathAdditions.BENCH1)
+
+
+def test_remove_addition(game):
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place(Tile(10, 10))
+    game.paths.place_addition(Tile(10, 10), FootpathAdditions.LAMP1)
+    assert game.world.get_tile(Tile(10, 10)).paths[0].addition is not None
+
+    game.paths.remove_addition(Tile(10, 10))
+    assert game.world.get_tile(Tile(10, 10)).paths[0].addition is None
+
+
+def test_replace_addition(game):
+    """Placing a new addition over an existing one replaces it."""
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place(Tile(10, 10))
+    game.paths.place_addition(Tile(10, 10), FootpathAdditions.LAMP1)
+    _assert_addition_is(game, Tile(10, 10), FootpathAdditions.LAMP1)
+
+    game.paths.place_addition(Tile(10, 10), FootpathAdditions.LITTER1)
+    _assert_addition_is(game, Tile(10, 10), FootpathAdditions.LITTER1)
+
+
+def test_place_addition_no_path(game):
+    """Can't place addition on tile without a path."""
+    game.park.cheats.build_in_pause_mode()
+    with pytest.raises(ActionError):
+        game.paths.place_addition(Tile(30, 30), FootpathAdditions.LAMP1)
