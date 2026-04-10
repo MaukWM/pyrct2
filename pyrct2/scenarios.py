@@ -1,6 +1,9 @@
 """Built-in RCT2 scenario definitions."""
 
 from enum import StrEnum
+from pathlib import Path
+
+_FIXTURES_DIR = Path(__file__).parent.parent / "tests" / "fixtures"
 
 
 class Pack(StrEnum):
@@ -12,7 +15,15 @@ class Pack(StrEnum):
 
 
 class Scenario(StrEnum):
-    """Built-in RCT2 scenarios. Values are the .SC6 filenames."""
+    """Built-in RCT2 scenarios. Values are the .SC6 filenames.
+
+    Includes test fixtures (``Scenario.TEST_*``) that ship with pyrct2
+    and work out of the box — no RCT2 game data path needed.
+    """
+
+    # ── Test fixtures (ship with pyrct2) ────────────────────────────
+    TEST_PARK = str(_FIXTURES_DIR / "test_scenario.park")
+    TEST_PARK_WITH_GUESTS = str(_FIXTURES_DIR / "test_scenario_with_guests.park")
 
     # ── Base Game — Beginner ─────────────────────────────────────────
     CRAZY_CASTLE = "Crazy Castle.SC6"
