@@ -29,11 +29,12 @@ def _resolve_footpath_index(client: RCT2, obj_type: str, identifier: str) -> int
     )
 
 
-def _first_surface_index(client: RCT2) -> int:
-    """Return the index of the first non-queue footpath surface in the scenario."""
+def _first_surface_index(client: RCT2, *, queue: bool = False) -> int:
+    """Return the index of the first footpath surface matching the queue preference."""
     surfaces = client._query("get_objects", {"type": "footpath_surface"})
     for s in surfaces:
-        if "queue" not in s["identifier"]:
+        is_queue = "queue" in s["identifier"]
+        if is_queue == queue:
             return s["index"]
     return surfaces[0]["index"]
 
@@ -50,11 +51,12 @@ class PathsProxy:
     def __init__(self, client: RCT2) -> None:
         self._client = client
         self._default_surface = _first_surface_index(client)
+        self._default_queue_surface = _first_surface_index(client, queue=True)
         self._default_railings = _first_railings_index(client)
 
-    def _resolve_surface(self, surface: FootpathSurfaceInfo | None) -> int:
+    def _resolve_surface(self, surface: FootpathSurfaceInfo | None, *, queue: bool = False) -> int:
         if surface is None:
-            return self._default_surface
+            return self._default_queue_surface if queue else self._default_surface
         return _resolve_footpath_index(
             self._client,
             "footpath_surface",
@@ -75,6 +77,7 @@ class PathsProxy:
         tile: Tile,
         *,
         height: int | None = None,
+        slope: Direction | None = None,
         queue: bool = False,
         surface: FootpathSurfaceInfo | None = None,
         railings: FootpathRailingsInfo | None = None,
@@ -84,6 +87,15 @@ class PathsProxy:
         Args:
             tile: Where to place the path.
             height: Height in land steps. None = ground level.
+            slope: Direction the path rises toward. None = flat path.
+                The path bridges one land step: its low end is at ``height``
+                and its high end is at ``height + 1``, toward the given
+                direction. For example, ``slope=Direction.EAST`` creates a
+                ramp whose west side is low and east side is high.
+                Auto-connect links the low end to a flat neighbor at the
+                same height and the high end to a flat neighbor one step up.
+                Slopes do not connect perpendicular — use a flat landing pad
+                for turns.
             queue: If True, place a queue path.
             surface: Footpath surface. None = scenario default.
             railings: Footpath railings. None = scenario default.
@@ -92,16 +104,22 @@ class PathsProxy:
         flags = PathConstructFlags(0)
         if queue:
             flags = PathConstructFlags.IS_QUEUE
+        if slope is not None:
+            s_type = FootpathSlopeType.SLOPED
+            s_dir = slope
+        else:
+            s_type = FootpathSlopeType.FLAT
+            s_dir = Direction(0)
         return ActionResult.from_response(
             self._client.actions.footpath_place(
                 x=tile.x * TILE_SIZE,
                 y=tile.y * TILE_SIZE,
                 z=z,
-                object=self._resolve_surface(surface),
+                object=self._resolve_surface(surface, queue=queue),
                 railings_object=self._resolve_railings(railings),
                 direction=INVALID_DIRECTION,
-                slope_type=FootpathSlopeType.FLAT,
-                slope_direction=Direction(0),
+                slope_type=s_type,
+                slope_direction=s_dir,
                 construct_flags=flags,
             )
         )

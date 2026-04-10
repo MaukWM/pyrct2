@@ -2,7 +2,7 @@
 
 import pytest
 
-from pyrct2._generated.enums import Direction
+from pyrct2._generated.enums import Direction, EdgeBit
 from pyrct2._generated.objects import RideObjects
 from pyrct2.errors import ActionError
 from pyrct2.world._tile import Tile
@@ -20,12 +20,11 @@ def test_place_path(game):
 def test_place_path_auto_connects(game):
     """Place a 2x2 square and verify all edges connect correctly.
 
-    Layout:        Edge bits: bit0=W, bit1=S, bit2=E, bit3=N
+    Layout:
       NW  NE
       SW  SE
     """
     game.park.cheats.build_in_pause_mode()
-    # NW, NE, SW, SE
     game.paths.place(Tile(10, 10))
     game.paths.place(Tile(11, 10))
     game.paths.place(Tile(10, 11))
@@ -36,18 +35,14 @@ def test_place_path_auto_connects(game):
     sw = game.world.get_tile(Tile(10, 11)).paths[0].edges
     se = game.world.get_tile(Tile(11, 11)).paths[0].edges
 
-    # NW: east + south
-    assert nw & 0b0100, "NW should have east edge"
-    assert nw & 0b0010, "NW should have south edge"
-    # NE: west + south
-    assert ne & 0b0001, "NE should have west edge"
-    assert ne & 0b0010, "NE should have south edge"
-    # SW: east + north
-    assert sw & 0b0100, "SW should have east edge"
-    assert sw & 0b1000, "SW should have north edge"
-    # SE: west + north
-    assert se & 0b0001, "SE should have west edge"
-    assert se & 0b1000, "SE should have north edge"
+    assert nw & EdgeBit.EAST, "NW should have east edge"
+    assert nw & EdgeBit.SOUTH, "NW should have south edge"
+    assert ne & EdgeBit.WEST, "NE should have west edge"
+    assert ne & EdgeBit.SOUTH, "NE should have south edge"
+    assert sw & EdgeBit.EAST, "SW should have east edge"
+    assert sw & EdgeBit.NORTH, "SW should have north edge"
+    assert se & EdgeBit.WEST, "SE should have west edge"
+    assert se & EdgeBit.NORTH, "SE should have north edge"
 
 
 def test_place_queue_path(game):
@@ -56,6 +51,10 @@ def test_place_queue_path(game):
 
     path = game.world.get_tile(Tile(10, 10)).paths[0]
     assert path.isQueue is True
+    # Verify a queue surface was auto-selected
+    surfaces = game._query("get_objects", {"type": "footpath_surface"})
+    surface_id = next(s["identifier"] for s in surfaces if s["index"] == path.surfaceObject)
+    assert "queue" in surface_id, f"expected queue surface, got {surface_id}"
 
 
 # ── Failure modes ────────────────────────────────────────────────────
@@ -154,3 +153,85 @@ def test_remove_path_ground_keeps_elevated(game):
     paths = game.world.get_tile(Tile(10, 10)).paths
     assert len(paths) == 1
     assert paths[0].baseZ > game.world.get_tile(Tile(10, 10)).surface.baseZ
+
+
+# ── Slopes ───────────────────────────────────────────────────────────
+
+
+def test_place_slope(game):
+    """Place a sloped path and verify it's sloped in the right direction."""
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place(Tile(10, 10), slope=Direction.EAST)
+
+    path = game.world.get_tile(Tile(10, 10)).paths[0]
+    assert path.slopeDirection == Direction.EAST
+    # Sloped clearance = baseZ + kPathClearance(32) + kPathHeightStep(16) = baseZ + 48
+    assert path.clearanceZ == path.baseZ + 48
+
+
+def test_slope_auto_connects_flat_to_flat(game):
+    """flat → slope → flat(higher) auto-connects end-to-end.
+
+    slope=Direction.EAST means: low end is west, high end is east.
+    The flat path west of the slope is at the same height.
+    The flat path east of the slope is one land step higher.
+    """
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place(Tile(10, 10))                          # flat (low side)
+    game.paths.place(Tile(11, 10), slope=Direction.EAST)    # slope rising east
+    game.paths.place(Tile(12, 10), height=8)                # flat (high side, +1 step)
+
+    low = game.world.get_tile(Tile(10, 10)).paths[0]
+    slope = game.world.get_tile(Tile(11, 10)).paths[0]
+    high = game.world.get_tile(Tile(12, 10)).paths[0]
+
+    assert low.edges & EdgeBit.EAST, "low should connect east to slope"
+    assert slope.edges & EdgeBit.WEST, "slope should connect west to low"
+    assert slope.edges & EdgeBit.EAST, "slope should connect east to high"
+    assert high.edges & EdgeBit.WEST, "high should connect west to slope"
+
+
+def test_slope_no_perpendicular_connection(game):
+    """Slopes don't connect sideways — only along their axis."""
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place(Tile(10, 10), slope=Direction.EAST)    # slope east
+    game.paths.place(Tile(10, 11))                          # flat south
+
+    slope = game.world.get_tile(Tile(10, 10)).paths[0]
+    flat = game.world.get_tile(Tile(10, 11)).paths[0]
+
+    assert slope.edges == 0, "slope should have no edges (no along-axis neighbors)"
+    assert flat.edges == 0, "flat should have no edges (perpendicular to slope)"
+
+
+def test_slope_staircase(game):
+    """Multiple slopes in sequence form a staircase."""
+    game.park.cheats.build_in_pause_mode()
+    # 3 slopes going east, each one land step higher
+    for i in range(3):
+        game.paths.place(Tile(10 + i, 10), slope=Direction.EAST, height=7 + i)
+
+    # Middle slope should connect both ways
+    middle = game.world.get_tile(Tile(11, 10)).paths[0]
+    assert middle.edges & EdgeBit.WEST, "middle slope connects west (down)"
+    assert middle.edges & EdgeBit.EAST, "middle slope connects east (up)"
+
+
+def test_slope_removal_uses_base_z(game):
+    """Removing a slope uses its baseZ (lower end), not topZ."""
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place(Tile(10, 10), slope=Direction.EAST)
+
+    # Default removal (ground level) should work — baseZ is ground level
+    game.paths.remove(Tile(10, 10))
+    assert len(game.world.get_tile(Tile(10, 10)).paths) == 0
+
+
+def test_slope_queue(game):
+    """Queue paths work on slopes."""
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place(Tile(10, 10), slope=Direction.EAST, queue=True)
+
+    path = game.world.get_tile(Tile(10, 10)).paths[0]
+    assert path.isQueue is True
+    assert path.slopeDirection == Direction.EAST
