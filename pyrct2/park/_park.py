@@ -9,8 +9,9 @@ from pyrct2._generated.state import GameDate, ScenarioObjective
 from pyrct2.park._cheats import CheatsProxy
 from pyrct2.park._climate import ClimateProxy
 from pyrct2.park._finance import FinanceProxy
-from pyrct2.park._research import ResearchProxy
 from pyrct2.park._guests import GuestsProxy
+from pyrct2.park._marketing import MarketingProxy
+from pyrct2.park._research import ResearchProxy
 from pyrct2.park._staff import StaffProxy
 from pyrct2.result import ActionResult
 
@@ -25,6 +26,7 @@ class ParkProxy:
     climate: ClimateProxy
     finance: FinanceProxy
     guests: GuestsProxy
+    marketing: MarketingProxy
     research: ResearchProxy
     staff: StaffProxy
 
@@ -34,6 +36,7 @@ class ParkProxy:
         self.climate = ClimateProxy(client)
         self.finance = FinanceProxy(client)
         self.guests = GuestsProxy(client)
+        self.marketing = MarketingProxy(client)
         self.research = ResearchProxy(client)
         self.staff = StaffProxy(client)
 
