@@ -6,9 +6,10 @@ import pytest
 
 from pyrct2.client import RCT2
 
-FIXTURES_DIR = Path(__file__).parent / "fixtures"
-TEST_SCENARIO = FIXTURES_DIR / "test_scenario.park"
-TEST_SCENARIO_WITH_GUESTS = FIXTURES_DIR / "test_scenario_with_guests.park"
+from pyrct2.scenarios import Scenario
+
+TEST_SCENARIO = Scenario.TEST_PARK
+TEST_SCENARIO_WITH_GUESTS = Scenario.TEST_PARK_WITH_GUESTS
 
 
 @pytest.fixture
