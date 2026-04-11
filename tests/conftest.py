@@ -1,7 +1,5 @@
 """Shared fixtures for pyrct2 integration tests."""
 
-from pathlib import Path
-
 import pytest
 
 from pyrct2.client import RCT2
