@@ -141,6 +141,100 @@ def test_place_flat_ride_entrance_blocked_by_existing_ride(game):
     assert len(game.rides.list()) == 1
 
 
+# ── Reachability ─────────────────────────────────────────────────────
+
+
+def test_ride_not_reachable_without_paths(game):
+    """Ride with no paths is not reachable."""
+    game.park.cheats.build_in_pause_mode()
+    ride = game.rides.place_flat_ride(
+        obj=RideObjects.gentle.MERRY_GO_ROUND,
+        tile=Tile(20, 20),
+        entrance=Tile(20, 22),
+        exit=Tile(20, 18),
+    )
+    assert not ride.is_reachable()
+
+
+def test_ride_not_reachable_with_only_entrance(game):
+    """Ride with only entrance path is not fully reachable."""
+    game.park.cheats.build_in_pause_mode()
+    ride = game.rides.place_flat_ride(
+        obj=RideObjects.gentle.MERRY_GO_ROUND,
+        tile=Tile(20, 20),
+        entrance=Tile(20, 22),
+        exit=Tile(20, 18),
+    )
+    game.paths.place(Tile(20, 23), queue=True)
+    assert not ride.is_reachable()
+
+
+def test_ride_reachable_with_both_paths(game):
+    """Ride with entrance queue + exit path is reachable."""
+    game.park.cheats.build_in_pause_mode()
+    ride = game.rides.place_flat_ride(
+        obj=RideObjects.gentle.MERRY_GO_ROUND,
+        tile=Tile(20, 20),
+        entrance=Tile(20, 22),
+        exit=Tile(20, 18),
+    )
+    game.paths.place(Tile(20, 23), queue=True)
+    game.paths.place(Tile(20, 17))
+    assert ride.is_reachable()
+
+
+def test_ride_reachable_with_target(game):
+    """Ride reachable from a distant target tile via path network."""
+    game.park.cheats.build_in_pause_mode()
+    ride = game.rides.place_flat_ride(
+        obj=RideObjects.gentle.MERRY_GO_ROUND,
+        tile=Tile(20, 20),
+        entrance=Tile(20, 22),
+        exit=Tile(20, 18),
+    )
+    target = Tile(20, 30)
+
+    # Paths exist but not connected to target
+    game.paths.place(Tile(20, 23), queue=True)
+    game.paths.place(Tile(20, 17))
+    assert not ride.is_reachable(target)
+
+    # Connect entrance queue → target, and exit → same path network
+    game.paths.place_line(Tile(20, 24), Tile(20, 30))  # entrance side to target
+    game.paths.place_line(Tile(20, 17), Tile(20, 14))  # exit side south
+    game.paths.place_line(Tile(14, 14), Tile(14, 30))  # west corridor
+    game.paths.place(Tile(14, 14))
+    game.paths.place_line(Tile(15, 14), Tile(19, 14))  # connect exit path to corridor
+    game.paths.place_line(Tile(14, 30), Tile(20, 30))  # connect corridor to target
+    assert ride.is_reachable(target)
+
+
+def test_stall_reachable(game):
+    """Stall facing a path is reachable."""
+    game.park.cheats.build_in_pause_mode()
+    stall = game.rides.place_stall(
+        RideObjects.stall.BURGER_BAR,
+        Tile(20, 20),
+        direction=Direction.SOUTH,
+    )
+    assert not stall.is_reachable()
+
+    game.paths.place(Tile(20, 21))
+    assert stall.is_reachable()
+
+
+def test_stall_facing_wrong_way(game):
+    """Stall facing away from path is not reachable."""
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place(Tile(20, 21))
+
+    stall = game.rides.place_stall(
+        RideObjects.stall.BURGER_BAR,
+        Tile(20, 20),
+        direction=Direction.NORTH,
+    )
+    assert not stall.is_reachable()
+
 
 # ── Integration tests ────────────────────────────────────────────────
 
@@ -276,7 +370,6 @@ def test_place_flat_ride_in_the_sky(game):
 
 def test_place_flat_ride_on_occupied_tile(game):
     """Placing a ride on an occupied tile without explicit height raises ActionError."""
-    from pyrct2.errors import ActionError
 
     game.park.cheats.build_in_pause_mode()
 

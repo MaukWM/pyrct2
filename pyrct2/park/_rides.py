@@ -27,13 +27,45 @@ if TYPE_CHECKING:
     from pyrct2.client import RCT2
 
 
+# Direction → (dx, dy) for tile neighbor lookups.
+_DIR_DELTA = {
+    Direction.WEST: (-1, 0),
+    Direction.NORTH: (0, -1),
+    Direction.EAST: (1, 0),
+    Direction.SOUTH: (0, 1),
+}
+
+
 class StationAccess(BaseModel):
-    """A station entrance or exit: tile position + facing direction."""
+    """A station entrance or exit: tile position + facing direction.
+
+    TODO: ``direction`` reports the ride's orientation, not the entrance/exit's
+    true facing. Both entrance and exit return the same direction regardless of
+    placement. Do not rely on it for path connectivity — use
+    ``RideEntity.is_entrance_connected()`` instead.
+    """
 
     model_config = ConfigDict(frozen=True)
 
     tile: Tile
     direction: Direction
+
+
+def _access_path_tile(access: StationAccess, client: RCT2, ride_id: int) -> Tile:
+    """The tile where a path must exist to connect to this entrance/exit.
+
+    The entrance/exit direction field is unreliable (reports ride direction,
+    not true facing). Instead, find the neighbor with track belonging to
+    this ride, then the path tile is on the opposite side.
+    """
+    for d, (dx, dy) in _DIR_DELTA.items():
+        neighbor = Tile(access.tile.x + dx, access.tile.y + dy)
+        td = client.world.get_tile(neighbor)
+        if any(t.ride == ride_id for t in td.tracks):
+            opposite = Direction((d + 2) % 4)
+            odx, ody = _DIR_DELTA[opposite]
+            return Tile(access.tile.x + odx, access.tile.y + ody)
+    return access.tile
 
 
 class RideEntity(EntityBase):
@@ -104,6 +136,61 @@ class RideEntity(EntityBase):
             tile=Tile.from_world(e.x, e.y),
             direction=Direction(e.direction),
         )
+
+    def is_reachable(self, target: Tile | None = None) -> bool:
+        """Check if guests can reach this ride or stall.
+
+        For rides: checks both entrance and exit have an adjacent path.
+        For stalls: checks the tile the stall faces has a path.
+
+        If ``target`` is given, also verifies path connectivity to that
+        tile (e.g. the park entrance). Expensive with target (BFS over
+        all paths).
+
+        For diagnostics on which part is disconnected, check
+        ``is_entrance_reachable`` / ``is_exit_reachable`` individually.
+        """
+        if self.entrance is not None:
+            return self.is_entrance_reachable(target) and self.is_exit_reachable(target)
+        return self._has_path(self._stall_path_tile(), target)
+
+    def is_entrance_reachable(self, target: Tile | None = None) -> bool:
+        """Check if the ride entrance has a connected path.
+
+        Returns False for stalls (no entrance).
+        """
+        return self._has_path(self._ride_path_tile(self.entrance), target)
+
+    def is_exit_reachable(self, target: Tile | None = None) -> bool:
+        """Check if the ride exit has a connected path.
+
+        Returns False for stalls (no exit).
+        """
+        return self._has_path(self._ride_path_tile(self.exit), target)
+
+    def _has_path(self, tile: Tile | None, target: Tile | None) -> bool:
+        if tile is None:
+            return False
+        td = self._client.world.get_tile(tile)
+        if not td.paths:
+            return False
+        if target is None:
+            return True
+        return self._client.paths.is_connected(tile, target)
+
+    def _ride_path_tile(self, access: StationAccess | None) -> Tile | None:
+        """Find the guest-facing tile for a ride entrance/exit."""
+        if access is None:
+            return None
+        return _access_path_tile(access, self._client, self._id)
+
+    def _stall_path_tile(self) -> Tile | None:
+        """Find the tile a stall faces (where guests approach from)."""
+        d = self.direction
+        if d is None:
+            return None
+        dx, dy = _DIR_DELTA[d]
+        return Tile(self.placement_tile.x + dx, self.placement_tile.y + dy)
 
     def refresh(self) -> None:
         """Re-fetch this ride's state from the game.
@@ -331,7 +418,7 @@ class RidesProxy:
                 station=0,
                 is_exit=True,
             )
-        except ActionError as e:
+        except ActionError:
             # Demolish the orphaned ride so it doesn't pollute the game
             self._client.actions.ride_demolish(
                 ride=ride_id,
