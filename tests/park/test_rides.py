@@ -179,9 +179,9 @@ def test_entrance_not_reachable_queue_perpendicular(game):
     game.park.cheats.build_in_pause_mode()
 
     # Build a horizontal path spine with a queue in the middle
-    game.paths.place(Tile(19, 23))                        # west path
-    game.paths.place(Tile(20, 23), queue=True)             # queue
-    game.paths.place(Tile(21, 23))                        # east path
+    game.paths.place(Tile(19, 23))  # west path
+    game.paths.place(Tile(20, 23), queue=True)  # queue
+    game.paths.place(Tile(21, 23))  # east path
     # Queue at (20, 23) now has E+W edges, fenced on N+S
 
     # Place ride north of the queue: center (20, 20), entrance at (20, 22)
