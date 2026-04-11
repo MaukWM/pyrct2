@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict
 
 from pyrct2._generated.enums import (
     Direction,
+    EdgeBit,
     RideInspection,
     RideModifyType,
     RideSetSetting,
@@ -35,6 +36,14 @@ _DIR_DELTA = {
     Direction.SOUTH: (0, 1),
 }
 
+# Direction → EdgeBit. The edge a path needs to connect in that direction.
+_DIR_EDGE = {
+    Direction.WEST: EdgeBit.WEST,
+    Direction.NORTH: EdgeBit.NORTH,
+    Direction.EAST: EdgeBit.EAST,
+    Direction.SOUTH: EdgeBit.SOUTH,
+}
+
 
 class StationAccess(BaseModel):
     """A station entrance or exit: tile position + facing direction.
@@ -51,8 +60,11 @@ class StationAccess(BaseModel):
     direction: Direction
 
 
-def _access_path_tile(access: StationAccess, client: RCT2, ride_id: int) -> Tile:
+def _access_path_tile(access: StationAccess, client: RCT2, ride_id: int) -> tuple[Tile, EdgeBit]:
     """The tile where a path must exist to connect to this entrance/exit.
+
+    Returns (path_tile, required_edge). The path on path_tile must have
+    required_edge set to actually connect to the entrance/exit.
 
     The entrance/exit direction field is unreliable (reports ride direction,
     not true facing). Instead, find the neighbor with track belonging to
@@ -62,10 +74,14 @@ def _access_path_tile(access: StationAccess, client: RCT2, ride_id: int) -> Tile
         neighbor = Tile(access.tile.x + dx, access.tile.y + dy)
         td = client.world.get_tile(neighbor)
         if any(t.ride == ride_id for t in td.tracks):
+            # Path is on the opposite side from the ride
             opposite = Direction((d + 2) % 4)
             odx, ody = _DIR_DELTA[opposite]
-            return Tile(access.tile.x + odx, access.tile.y + ody)
-    return access.tile
+            path_tile = Tile(access.tile.x + odx, access.tile.y + ody)
+            # Path needs an edge pointing back toward the entrance
+            required_edge = _DIR_EDGE[d]
+            return path_tile, required_edge
+    return access.tile, EdgeBit(0)
 
 
 class RideEntity(EntityBase):
@@ -140,8 +156,10 @@ class RideEntity(EntityBase):
     def is_reachable(self, target: Tile | None = None) -> bool:
         """Check if guests can reach this ride or stall.
 
-        For rides: checks both entrance and exit have an adjacent path.
-        For stalls: checks the tile the stall faces has a path.
+        For rides: checks both entrance and exit have an adjacent path
+        with an edge facing the entrance/exit.
+        For stalls: checks the tile the stall faces has a path with an
+        edge facing the stall.
 
         If ``target`` is given, also verifies path connectivity to that
         tile (e.g. the park entrance). Expensive with target (BFS over
@@ -152,45 +170,67 @@ class RideEntity(EntityBase):
         """
         if self.entrance is not None:
             return self.is_entrance_reachable(target) and self.is_exit_reachable(target)
-        return self._has_path(self._stall_path_tile(), target)
+        return self._check_path(*self._stall_path_info(), target)
 
     def is_entrance_reachable(self, target: Tile | None = None) -> bool:
-        """Check if the ride entrance has a connected path.
+        """Check if the ride entrance has a connected path with correct edge.
 
         Returns False for stalls (no entrance).
         """
-        return self._has_path(self._ride_path_tile(self.entrance), target)
+        info = self._ride_path_info(self.entrance)
+        if info is None:
+            return False
+        return self._check_path(*info, target)
 
     def is_exit_reachable(self, target: Tile | None = None) -> bool:
-        """Check if the ride exit has a connected path.
+        """Check if the ride exit has an adjacent path.
+
+        Unlike entrances, exits don't require a specific edge — the game
+        engine connects guests to any adjacent path regardless of edges.
 
         Returns False for stalls (no exit).
         """
-        return self._has_path(self._ride_path_tile(self.exit), target)
+        info = self._ride_path_info(self.exit)
+        if info is None:
+            return False
+        tile, _edge = info
+        return self._check_path(tile, EdgeBit(0), target)
 
-    def _has_path(self, tile: Tile | None, target: Tile | None) -> bool:
+    def _check_path(self, tile: Tile | None, required_edge: EdgeBit, target: Tile | None) -> bool:
         if tile is None:
             return False
         td = self._client.world.get_tile(tile)
         if not td.paths:
             return False
+        # Edge check: a path/queue with 2+ edges (connected on both sides)
+        # but none facing the entrance is fenced off — the perpendicular
+        # queue problem. Paths with 0 or 1 edges connect to the entrance
+        # implicitly via the game engine (edges are never set toward
+        # entrance/exit elements).
+        if required_edge:
+            for p in td.paths:
+                edge_count = bin(p.edges).count("1")
+                if edge_count >= 2 and not (p.edges & required_edge):
+                    return False
         if target is None:
             return True
         return self._client.paths.is_connected(tile, target)
 
-    def _ride_path_tile(self, access: StationAccess | None) -> Tile | None:
-        """Find the guest-facing tile for a ride entrance/exit."""
+    def _ride_path_info(self, access: StationAccess | None) -> tuple[Tile, EdgeBit] | None:
+        """Find the path tile + required edge for a ride entrance/exit."""
         if access is None:
             return None
         return _access_path_tile(access, self._client, self._id)
 
-    def _stall_path_tile(self) -> Tile | None:
-        """Find the tile a stall faces (where guests approach from)."""
+    def _stall_path_info(self) -> tuple[Tile | None, EdgeBit]:
+        """Find the path tile + required edge for a stall."""
         d = self.direction
         if d is None:
-            return None
+            return None, EdgeBit(0)
         dx, dy = _DIR_DELTA[d]
-        return Tile(self.placement_tile.x + dx, self.placement_tile.y + dy)
+        tile = Tile(self.placement_tile.x + dx, self.placement_tile.y + dy)
+        opposite = Direction((d + 2) % 4)
+        return tile, _DIR_EDGE[opposite]
 
     def refresh(self) -> None:
         """Re-fetch this ride's state from the game.

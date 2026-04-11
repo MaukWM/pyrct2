@@ -169,6 +169,41 @@ def test_ride_not_reachable_with_only_entrance(game):
     assert not ride.is_reachable()
 
 
+def test_entrance_not_reachable_queue_perpendicular(game):
+    """Queue placed along a path with entrance perpendicular has no edge toward entrance.
+
+    Reproduces: place queue, then paths on both sides (E-W). The queue gets
+    fenced on N/S. Then a ride entrance placed to the north can't connect
+    because the queue has no north edge.
+    """
+    game.park.cheats.build_in_pause_mode()
+
+    # Build a horizontal path spine with a queue in the middle
+    game.paths.place(Tile(19, 23))                        # west path
+    game.paths.place(Tile(20, 23), queue=True)             # queue
+    game.paths.place(Tile(21, 23))                        # east path
+    # Queue at (20, 23) now has E+W edges, fenced on N+S
+
+    # Place ride north of the queue: center (20, 20), entrance at (20, 22)
+    # The access tile for the entrance is (20, 23) — where the queue is
+    ride = game.rides.place_flat_ride(
+        obj=RideObjects.gentle.MERRY_GO_ROUND,
+        tile=Tile(20, 20),
+        entrance=Tile(20, 22),
+        exit=Tile(18, 20),
+    )
+
+    # The queue exists but has no north edge toward the entrance — NOT reachable
+    assert not ride.is_entrance_reachable()
+
+    # Exit just needs any adjacent path (no edge required)
+    game.paths.place(Tile(17, 20))
+    assert ride.is_exit_reachable()
+
+    # Overall not reachable because entrance is blocked
+    assert not ride.is_reachable()
+
+
 def test_ride_reachable_with_both_paths(game):
     """Ride with entrance queue + exit path is reachable."""
     game.park.cheats.build_in_pause_mode()
@@ -199,13 +234,13 @@ def test_ride_reachable_with_target(game):
     game.paths.place(Tile(20, 17))
     assert not ride.is_reachable(target)
 
-    # Connect entrance queue → target, and exit → same path network
-    game.paths.place_line(Tile(20, 24), Tile(20, 30))  # entrance side to target
-    game.paths.place_line(Tile(20, 17), Tile(20, 14))  # exit side south
-    game.paths.place_line(Tile(14, 14), Tile(14, 30))  # west corridor
-    game.paths.place(Tile(14, 14))
-    game.paths.place_line(Tile(15, 14), Tile(19, 14))  # connect exit path to corridor
-    game.paths.place_line(Tile(14, 30), Tile(20, 30))  # connect corridor to target
+    # Connect entrance → target (straight south)
+    game.paths.place_line(Tile(20, 24), Tile(20, 30))
+    # Connect exit → target (south then east then south)
+    game.paths.place_line(Tile(20, 16), Tile(20, 17))  # extend exit path
+    game.paths.place_line(Tile(18, 17), Tile(20, 17))  # join west
+    game.paths.place_line(Tile(18, 17), Tile(18, 30))  # south corridor
+    game.paths.place_line(Tile(18, 30), Tile(20, 30))  # connect to target
     assert ride.is_reachable(target)
 
 
