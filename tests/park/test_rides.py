@@ -4,6 +4,7 @@ import pytest
 
 from pyrct2._generated.enums import Direction, RideInspection
 from pyrct2._generated.objects import RideObjects
+from pyrct2.errors import ActionError
 from pyrct2.park import RideEntity, StationAccess
 from pyrct2.world import Tile
 from pyrct2.world._slope import LAND_HEIGHT_STEP
@@ -77,6 +78,68 @@ def test_place_flat_ride_entrance_diagonal(game):
             entrance=Tile(22, 22),
             exit=Tile(20, 18),
         )
+
+
+# ── Pre-check: entrance/exit tile clearance ─────────────────────────
+
+
+def test_place_flat_ride_entrance_blocked_by_path(game):
+    """Entrance on a tile with a footpath raises ValueError."""
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place(Tile(20, 22))
+
+    with pytest.raises(ValueError, match="blocked by"):
+        game.rides.place_flat_ride(
+            obj=RideObjects.gentle.MERRY_GO_ROUND,
+            tile=Tile(20, 20),
+            entrance=Tile(20, 22),
+            exit=Tile(20, 18),
+        )
+
+    # No orphaned ride left behind
+    assert game.rides.list() == []
+
+
+def test_place_flat_ride_exit_blocked_by_path(game):
+    """Exit on a tile with a footpath raises ValueError."""
+    game.park.cheats.build_in_pause_mode()
+    game.paths.place(Tile(20, 18))
+
+    with pytest.raises(ValueError, match="blocked by"):
+        game.rides.place_flat_ride(
+            obj=RideObjects.gentle.MERRY_GO_ROUND,
+            tile=Tile(20, 20),
+            entrance=Tile(20, 22),
+            exit=Tile(20, 18),
+        )
+
+    assert game.rides.list() == []
+
+
+def test_place_flat_ride_entrance_blocked_by_existing_ride(game):
+    """Entrance/exit on a tile with existing elements raises ValueError."""
+    game.park.cheats.build_in_pause_mode()
+
+    # First ride at (20, 20): footprint (19-21, 19-21)
+    game.rides.place_flat_ride(
+        obj=RideObjects.gentle.MERRY_GO_ROUND,
+        tile=Tile(20, 20),
+        entrance=Tile(22, 20),
+        exit=Tile(18, 20),
+    )
+
+    # Second ride at (23, 20), directly adjacent: footprint (22-24, 19-21)
+    # Entrance at (21, 20) has first ride's track → blocked
+    with pytest.raises(ValueError, match="blocked by"):
+        game.rides.place_flat_ride(
+            obj=RideObjects.gentle.MERRY_GO_ROUND,
+            tile=Tile(23, 20),
+            entrance=Tile(21, 20),
+            exit=Tile(25, 20),
+        )
+
+    assert len(game.rides.list()) == 1
+
 
 
 # ── Integration tests ────────────────────────────────────────────────

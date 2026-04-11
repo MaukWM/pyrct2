@@ -19,7 +19,7 @@ from pyrct2._generated.enums import (
 from pyrct2._entity import EntityBase
 from pyrct2._generated.objects import RIDE_TYPE_TRACK_ELEMS, RideObjectInfo
 from pyrct2._generated.state import Ride
-from pyrct2.errors import QueryError
+from pyrct2.errors import ActionError, QueryError
 from pyrct2.result import ActionResult
 from pyrct2.world._tile import TILE_SIZE, Tile
 
@@ -301,30 +301,43 @@ class RidesProxy:
                 f"Exit {exit} is not adjacent to the ride footprint. "
                 f"Place it on a tile directly next to (not diagonal to) the footprint edge."
             )
+        # Pre-check: entrance/exit tiles must have only a surface element
+        for label, t in [("Entrance", entrance), ("Exit", exit)]:
+            td = self._client.world.get_tile(t)
+            blockers = [e.type for e in td.elements if e.type != "surface"]
+            if blockers:
+                raise ValueError(
+                    f"{label} tile ({t.x}, {t.y}) is blocked by: {', '.join(blockers)}. "
+                    f"Clear the tile or choose a different one."
+                )
+
         ride_id, ride_type = self._create_ride(obj, tile, height, direction)
 
-        # TODO: Add rollback/transaction support. If entrance/exit placement
-        # fails after ride_create, the ride slot is orphaned. A general
-        # transaction pattern (context manager?) would auto-demolish on failure.
-        # For now, failures leave an orphaned ride that the developer must clean up.
-
-        # Place entrance and exit
-        self._client.actions.ride_entrance_exit_place(
-            x=entrance.x * TILE_SIZE,
-            y=entrance.y * TILE_SIZE,
-            direction=direction,
-            ride=ride_id,
-            station=0,
-            is_exit=False,
-        )
-        self._client.actions.ride_entrance_exit_place(
-            x=exit.x * TILE_SIZE,
-            y=exit.y * TILE_SIZE,
-            direction=direction,
-            ride=ride_id,
-            station=0,
-            is_exit=True,
-        )
+        # Place entrance and exit, rolling back the ride on failure
+        try:
+            self._client.actions.ride_entrance_exit_place(
+                x=entrance.x * TILE_SIZE,
+                y=entrance.y * TILE_SIZE,
+                direction=direction,
+                ride=ride_id,
+                station=0,
+                is_exit=False,
+            )
+            self._client.actions.ride_entrance_exit_place(
+                x=exit.x * TILE_SIZE,
+                y=exit.y * TILE_SIZE,
+                direction=direction,
+                ride=ride_id,
+                station=0,
+                is_exit=True,
+            )
+        except ActionError as e:
+            # Demolish the orphaned ride so it doesn't pollute the game
+            self._client.actions.ride_demolish(
+                ride=ride_id,
+                modify_type=RideModifyType.DEMOLISH,
+            )
+            raise
 
         ride = self.get(ride_id)
         if ride is None:
