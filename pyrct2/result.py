@@ -14,10 +14,11 @@ class ActionResult:
     is created, the response has already passed through execute() which
     raises on any game_error.
 
-    cost is always present because OpenRCT2's GameActions::Result has
-    ``money64 cost = 0`` as a default-initialized member — every action
-    result carries it, even free ones like cheats (cost=0).
-    See: https://github.com/OpenRCT2/OpenRCT2/blob/develop/src/openrct2/actions/GameActionResult.h
+    C++ GameActions::Result always initializes ``money64 cost = 0``
+    (GameActionResult.h:65), and standard actions set it explicitly.
+    However, the plugin API types cost as optional (``cost?: number``
+    in openrct2.d.ts:1612) because ScriptEngine.cpp:1210 conditionally
+    omits it when ``cost == kMoney64Undefined``. So we default to 0.
     """
 
     cost: int
@@ -26,8 +27,8 @@ class ActionResult:
     def from_response(cls, resp: dict) -> ActionResult:
         """Create from a raw bridge response dict.
 
-        Only called after execute() has verified success — the response
-        is guaranteed to have payload.cost at this point.
+        Only called after execute() has verified success.
         """
         assert resp.get("success") is True, f"from_response called on non-success response: {resp}"
-        return cls(cost=resp["payload"]["cost"])
+        # Defensive: ScriptEngine.cpp:1210 skips cost when kMoney64Undefined
+        return cls(cost=resp.get("payload", {}).get("cost", 0))
