@@ -2,6 +2,7 @@
 
 import json
 import socket
+import threading
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 20020
@@ -23,6 +24,7 @@ class Connection:
         self._socket.settimeout(timeout)
         self._socket.connect((host, port))
         self._buffer = ""
+        self._lock = threading.Lock()
 
     def _recv_line(self) -> str:
         """Read one complete newline-delimited line from the socket."""
@@ -36,19 +38,25 @@ class Connection:
         return line
 
     def send(self, endpoint: str, params: dict | None = None) -> dict:
-        """Send a request and return the parsed response."""
-        msg: dict = {"endpoint": endpoint}
-        if params is not None:
-            msg["params"] = params
+        """Send a request and return the parsed response.
 
-        self._socket.sendall(json.dumps(msg).encode() + b"\n")
+        Thread-safe: a per-instance lock serializes concurrent calls so the
+        request-response pair (and _buffer access) stays atomic. Parallel
+        game instances are unaffected — each has its own Connection/lock.
+        """
+        with self._lock:
+            msg: dict = {"endpoint": endpoint}
+            if params is not None:
+                msg["params"] = params
 
-        # Consume progress heartbeats, return the final response
-        parsed = json.loads(self._recv_line())
-        while parsed.get("type") == "progress":
+            self._socket.sendall(json.dumps(msg).encode() + b"\n")
+
+            # Consume progress heartbeats, return the final response
             parsed = json.loads(self._recv_line())
+            while parsed.get("type") == "progress":
+                parsed = json.loads(self._recv_line())
 
-        return parsed
+            return parsed
 
     def close(self) -> None:
         """Close the TCP connection."""
