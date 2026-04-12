@@ -370,14 +370,24 @@ class PathsProxy:
 
         from_paths = all_paths.get((from_tile.x, from_tile.y), [])
         to_paths = all_paths.get((to_tile.x, to_tile.y), [])
-        if not from_paths or not to_paths:
+        if not from_paths:
             return False
+
+        # Target might be a park entrance (no path element, but reachable
+        # via edges from adjacent paths).
+        target_is_entrance = False
+        if not to_paths:
+            td = self._client.world.get_tile(to_tile)
+            entrances = [e for e in td.elements if e.type == "entrance"]
+            if not entrances:
+                return False
+            target_is_entrance = True
 
         if len(from_paths) > 1 and from_height is None:
             raise ValueError(
                 f"{from_tile} has {len(from_paths)} paths at different heights — specify from_height to disambiguate"
             )
-        if len(to_paths) > 1 and to_height is None:
+        if not target_is_entrance and len(to_paths) > 1 and to_height is None:
             raise ValueError(
                 f"{to_tile} has {len(to_paths)} paths at different heights — specify to_height to disambiguate"
             )
@@ -388,7 +398,7 @@ class PathsProxy:
             from_paths = [p for p in from_paths if _path_reachable_at(p, from_z)]
             if not from_paths:
                 return False
-        if to_height is not None:
+        if not target_is_entrance and to_height is not None:
             to_z = to_height * LAND_HEIGHT_STEP
             to_paths = [p for p in to_paths if _path_reachable_at(p, to_z)]
             if not to_paths:
@@ -400,10 +410,16 @@ class PathsProxy:
 
         # Target z-values
         target_zs: set[int] = set()
-        for p in to_paths:
-            target_zs.add(p.baseZ)
-            if p.slopeDirection is not None:
-                target_zs.add(p.baseZ + LAND_HEIGHT_STEP)
+        if target_is_entrance:
+            td = self._client.world.get_tile(to_tile)
+            for e in td.elements:
+                if e.type == "entrance" and e.baseZ is not None:
+                    target_zs.add(e.baseZ)
+        else:
+            for p in to_paths:
+                target_zs.add(p.baseZ)
+                if p.slopeDirection is not None:
+                    target_zs.add(p.baseZ + LAND_HEIGHT_STEP)
 
         # Seed BFS from paths at from_tile
         start: set[tuple[int, int, int]] = set()

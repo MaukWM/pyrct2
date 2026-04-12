@@ -685,6 +685,43 @@ def test_is_connected_around_obstacle(game):
     assert game.paths.is_connected(Tile(10, 10), Tile(15, 10))
 
 
+def test_is_connected_to_park_entrance(game):
+    """Path connected to the park gate entrance tile."""
+    game.park.cheats.build_in_pause_mode()
+    # Park entrance center is at (49, 30).  Build a path line to it.
+    gate = Tile(49, 30)
+    game.paths.place_line(Tile(20, 30), Tile(48, 30))
+    assert game.paths.is_connected(Tile(20, 30), gate)
+
+
+def test_is_connected_to_park_entrance_disconnected(game):
+    """Path NOT connected to the park gate returns False."""
+    game.park.cheats.build_in_pause_mode()
+    gate = Tile(49, 30)
+    # Island of paths far from the gate, no link
+    game.paths.place_line(Tile(10, 10), Tile(15, 10))
+    assert not game.paths.is_connected(Tile(10, 10), gate)
+
+
+def test_is_connected_to_ride_entrance(game):
+    """Path connected to a ride entrance tile (entrance elements, not paths)."""
+    game.park.cheats.build_in_pause_mode()
+    ride = game.rides.place_flat_ride(
+        obj=RideObjects.gentle.MERRY_GO_ROUND,
+        tile=Tile(20, 20),
+        entrance=Tile(20, 22),
+        exit=Tile(20, 18),
+    )
+    # Queue from entrance, regular path extending south
+    game.paths.place(Tile(20, 23), queue=True)
+    game.paths.place_line(Tile(20, 24), Tile(20, 30))
+    # Path at (20,30) should be connected to the entrance tile
+    assert game.paths.is_connected(Tile(20, 30), ride.entrance.tile)
+    # And NOT connected to some random disconnected path
+    game.paths.place(Tile(10, 10))
+    assert not game.paths.is_connected(Tile(10, 10), ride.entrance.tile)
+
+
 # ── Default surface/railings ───────────────────────────────────────
 
 

@@ -107,9 +107,7 @@ def _entrance_direction(access_tile: Tile, footprint: set[Tile], ride_direction:
                 return Direction((d + 2) % 4)
             else:  # W or E: use same
                 return d
-    raise ValueError(
-        f"Tile ({access_tile.x}, {access_tile.y}) is not adjacent to the footprint"
-    )
+    raise ValueError(f"Tile ({access_tile.x}, {access_tile.y}) is not adjacent to the footprint")
 
 
 class RideEntity(EntityBase):
