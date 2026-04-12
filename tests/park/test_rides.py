@@ -532,12 +532,12 @@ def test_ride_entity_properties(game):
     # Entrance
     assert isinstance(ride.entrance, StationAccess)
     assert ride.entrance.tile == Tile(20, 22)
-    assert ride.entrance.direction == Direction.EAST
+    assert ride.entrance.direction == Direction.SOUTH  # faces outward (south, away from ride)
 
     # Exit
     assert isinstance(ride.exit, StationAccess)
     assert ride.exit.tile == Tile(20, 18)
-    assert ride.exit.direction == Direction.EAST
+    assert ride.exit.direction == Direction.NORTH  # faces outward (north, away from ride)
 
 
 def test_stall_entity_properties(game):

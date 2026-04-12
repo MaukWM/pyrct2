@@ -84,6 +84,34 @@ def _access_path_tile(access: StationAccess, client: RCT2, ride_id: int) -> tupl
     return access.tile, EdgeBit(0)
 
 
+def _entrance_direction(access_tile: Tile, footprint: set[Tile], ride_direction: Direction) -> Direction:
+    """Compute the correct direction for ride_entrance_exit_place.
+
+    Empirically determined by placing entrances via the game UI on all
+    4 sides of a NORTH-facing ride and reading the resulting direction:
+
+        Position    Toward-ride    Game UI dir
+        North       S(3)           N(1)  ← opposite
+        South       N(1)           S(3)  ← opposite
+        East        W(0)           W(0)  ← same
+        West        E(2)           E(2)  ← same
+
+    Rule: if toward-ride is odd (N=1 or S=3), use opposite.
+          If toward-ride is even (W=0 or E=2), use same.
+    """
+    for d, (dx, dy) in _DIR_DELTA.items():
+        neighbor = Tile(access_tile.x + dx, access_tile.y + dy)
+        if neighbor in footprint:
+            # d = direction from entrance toward ride
+            if d % 2 == 1:  # N or S: use opposite
+                return Direction((d + 2) % 4)
+            else:  # W or E: use same
+                return d
+    raise ValueError(
+        f"Tile ({access_tile.x}, {access_tile.y}) is not adjacent to the footprint"
+    )
+
+
 class RideEntity(EntityBase):
     """Wrapper around a Ride snapshot that adds action methods.
 
@@ -440,12 +468,17 @@ class RidesProxy:
 
         ride_id, ride_type = self._create_ride(obj, tile, height, direction)
 
+        # Compute entrance/exit direction: must face TOWARD the ride
+        # (the open/guest side faces the opposite way automatically).
+        entrance_dir = _entrance_direction(entrance, footprint_set, direction)
+        exit_dir = _entrance_direction(exit, footprint_set, direction)
+
         # Place entrance and exit, rolling back the ride on failure
         try:
             self._client.actions.ride_entrance_exit_place(
                 x=entrance.x * TILE_SIZE,
                 y=entrance.y * TILE_SIZE,
-                direction=direction,
+                direction=entrance_dir,
                 ride=ride_id,
                 station=0,
                 is_exit=False,
@@ -453,7 +486,7 @@ class RidesProxy:
             self._client.actions.ride_entrance_exit_place(
                 x=exit.x * TILE_SIZE,
                 y=exit.y * TILE_SIZE,
-                direction=direction,
+                direction=exit_dir,
                 ride=ride_id,
                 station=0,
                 is_exit=True,
