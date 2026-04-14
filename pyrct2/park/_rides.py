@@ -211,6 +211,11 @@ class RideEntity(EntityBase):
         connects to any park entrance via the path network.
 
         Returns False for rides (use is_entrance_reachable / is_exit_reachable).
+
+        Known issue: stalls like Information Kiosk are accessible from all
+        4 sides, but this only checks the single facing direction. A kiosk
+        next to a path on any side will work in-game but may report False
+        here if the facing direction doesn't point at the path.
         """
         if self.entrance is not None:
             return False

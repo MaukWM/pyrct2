@@ -72,10 +72,12 @@ class RCT2:
         Set headless=False to launch with the game window visible.
         """
         instance = launch(park_file, headless=headless)
+        # Pause before client init (which scans the map for entrances).
+        instance.connection.send("pause")
         client = cls(instance.connection, instance)
         client._check_bridge_version()
-        if start_paused:
-            client.pause()
+        if not start_paused:
+            client.unpause()
         return client
 
     @classmethod
