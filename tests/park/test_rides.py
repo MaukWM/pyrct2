@@ -141,6 +141,45 @@ def test_place_flat_ride_entrance_blocked_by_existing_ride(game):
     assert len(game.rides.list()) == 1
 
 
+# ── Local path check (_has_path_at) ──────────────────────────────────
+
+
+def test_has_path_at(game):
+    """Focused test for _has_path_at edge cases."""
+    game.park.cheats.build_in_pause_mode()
+    ride = game.rides.place_flat_ride(
+        obj=RideObjects.gentle.MERRY_GO_ROUND,
+        tile=Tile(20, 20),
+        entrance=Tile(20, 22),
+        exit=Tile(20, 18),
+    )
+    ent_tile, ent_edge = ride._ride_path_info(ride.entrance)
+    ext_tile, _ = ride._ride_path_info(ride.exit)
+
+    # No paths placed → False
+    assert not ride._has_path_at(ent_tile, required_edge=ent_edge)
+    assert not ride._has_path_at(ext_tile)
+
+    # Place paths → entrance needs correct edge, exit accepts any path
+    game.paths.place(Tile(20, 23), queue=True)
+    game.paths.place(Tile(20, 17))
+    assert ride._has_path_at(ent_tile, required_edge=ent_edge)
+    assert ride._has_path_at(ext_tile)
+
+    # Perpendicular queue: path exists but edge doesn't face entrance
+    game.rides.get(ride.data.id).demolish()
+    game.paths.place(Tile(19, 23))  # west — fences the queue E+W only
+    game.paths.place(Tile(21, 23))  # east
+    ride2 = game.rides.place_flat_ride(
+        obj=RideObjects.gentle.MERRY_GO_ROUND,
+        tile=Tile(20, 20),
+        entrance=Tile(20, 22),
+        exit=Tile(18, 20),
+    )
+    ent_tile2, ent_edge2 = ride2._ride_path_info(ride2.entrance)
+    assert not ride2._has_path_at(ent_tile2, required_edge=ent_edge2)
+
+
 # ── Reachability ─────────────────────────────────────────────────────
 # Park entrance arrival tile is at (48, 30) in the test scenario.
 
