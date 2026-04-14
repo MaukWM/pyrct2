@@ -170,68 +170,89 @@ class RideEntity(EntityBase):
             direction=Direction(e.direction),
         )
 
-    def is_reachable(self, target: Tile | None = None) -> bool:
-        """Check if guests can reach this ride or stall.
+    # ── Reachability (BFS to park entrance) ──────────────────────────
 
-        For rides: checks both entrance and exit have an adjacent path
-        with an edge facing the entrance/exit.
-        For stalls: checks the tile the stall faces has a path with an
-        edge facing the stall.
+    def is_entrance_reachable(self) -> bool:
+        """Whether guests can walk from a park entrance to this ride's entrance.
 
-        If ``target`` is given, also verifies path connectivity to that
-        tile (e.g. the park entrance). Expensive with target (BFS over
-        all paths).
+        Checks that a connected path exists adjacent to the entrance AND
+        that it connects to any park entrance via the path network.
 
-        For diagnostics on which part is disconnected, check
-        ``is_entrance_reachable`` / ``is_exit_reachable`` individually.
-        """
-        if self.entrance is not None:
-            return self.is_entrance_reachable(target) and self.is_exit_reachable(target)
-        return self._check_path(*self._stall_path_info(), target)
-
-    def is_entrance_reachable(self, target: Tile | None = None) -> bool:
-        """Check if the ride entrance has a connected path with correct edge.
-
-        Returns False for stalls (no entrance).
+        Returns False for stalls.
         """
         info = self._ride_path_info(self.entrance)
         if info is None:
             return False
-        return self._check_path(*info, target)
+        tile, edge = info
+        if not self._has_path_at(tile, required_edge=edge):
+            return False
+        return self._is_connected_to_park_entrance(tile)
 
-    def is_exit_reachable(self, target: Tile | None = None) -> bool:
-        """Check if the ride exit has an adjacent path.
+    def is_exit_reachable(self) -> bool:
+        """Whether guests leaving can walk from this ride's exit to a park entrance.
 
-        Unlike entrances, exits don't require a specific edge — the game
-        engine connects guests to any adjacent path regardless of edges.
+        Checks that a path exists adjacent to the exit AND that it
+        connects to any park entrance via the path network.
 
-        Returns False for stalls (no exit).
+        Returns False for stalls.
         """
         info = self._ride_path_info(self.exit)
         if info is None:
             return False
         tile, _edge = info
-        return self._check_path(tile, EdgeBit(0), target)
+        if not self._has_path_at(tile):
+            return False
+        return self._is_connected_to_park_entrance(tile)
 
-    def _check_path(self, tile: Tile | None, required_edge: EdgeBit, target: Tile | None) -> bool:
+    def is_stall_reachable(self) -> bool:
+        """Whether this stall is reachable from a park entrance.
+
+        Checks that the facing tile has a connected path AND that it
+        connects to any park entrance via the path network.
+
+        Returns False for rides (use is_entrance_reachable / is_exit_reachable).
+        """
+        if self.entrance is not None:
+            return False
+        tile, edge = self._stall_path_info()
+        if tile is None or not self._has_path_at(tile, edge):
+            return False
+        return self._is_connected_to_park_entrance(tile)
+
+    # ── Private helpers ──────────────────────────────────────────────
+
+    def _has_path_at(self, tile: Tile | None, required_edge: EdgeBit | None = None) -> bool:
+        """Check if a path exists on a tile, optionally with a required edge.
+
+        When ``required_edge`` is None, any path on the tile is sufficient
+        (used for exits, which don't require a specific edge direction).
+
+        Note: does not consider Z-height. If stacked paths exist at
+        different heights, this may match a path at the wrong level
+        and produce a false positive.
+        """
         if tile is None:
             return False
         td = self._client.world.get_tile(tile)
         if not td.paths:
             return False
-        # Edge check: a path/queue with 2+ edges (connected on both sides)
-        # but none facing the entrance is fenced off — the perpendicular
-        # queue problem. Paths with 0 or 1 edges connect to the entrance
-        # implicitly via the game engine (edges are never set toward
-        # entrance/exit elements).
-        if required_edge:
+        # Edge check: a path/queue with 2+ edges but none facing the
+        # entrance is fenced off (perpendicular queue problem). Paths
+        # with 0 or 1 edges connect implicitly via the game engine.
+        if required_edge is not None:
             for p in td.paths:
                 edge_count = bin(p.edges).count("1")
                 if edge_count >= 2 and not (p.edges & required_edge):
                     return False
-        if target is None:
-            return True
-        return self._client.paths.is_connected(tile, target)
+        return True
+
+    def _is_connected_to_park_entrance(self, tile: Tile) -> bool:
+        """BFS from tile to any park entrance arrival tile."""
+        entrances = self._client.park.entrances
+        return any(
+            self._client.paths.is_connected(tile, e.arrival_tile)
+            for e in entrances
+        )
 
     def _ride_path_info(self, access: StationAccess | None) -> tuple[Tile, EdgeBit] | None:
         """Find the path tile + required edge for a ride entrance/exit."""

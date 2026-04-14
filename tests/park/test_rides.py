@@ -142,10 +142,11 @@ def test_place_flat_ride_entrance_blocked_by_existing_ride(game):
 
 
 # ── Reachability ─────────────────────────────────────────────────────
+# Park entrance arrival tile is at (48, 30) in the test scenario.
 
 
 def test_ride_not_reachable_without_paths(game):
-    """Ride with no paths is not reachable."""
+    """Ride with no adjacent paths is not reachable."""
     game.park.cheats.build_in_pause_mode()
     ride = game.rides.place_flat_ride(
         obj=RideObjects.gentle.MERRY_GO_ROUND,
@@ -153,11 +154,12 @@ def test_ride_not_reachable_without_paths(game):
         entrance=Tile(20, 22),
         exit=Tile(20, 18),
     )
-    assert not ride.is_reachable()
+    assert not ride.is_entrance_reachable()
+    assert not ride.is_exit_reachable()
 
 
-def test_ride_not_reachable_with_only_entrance(game):
-    """Ride with only entrance path is not fully reachable."""
+def test_ride_not_reachable_without_connection_to_park(game):
+    """Ride with adjacent paths but no connection to park entrance."""
     game.park.cheats.build_in_pause_mode()
     ride = game.rides.place_flat_ride(
         obj=RideObjects.gentle.MERRY_GO_ROUND,
@@ -166,96 +168,71 @@ def test_ride_not_reachable_with_only_entrance(game):
         exit=Tile(20, 18),
     )
     game.paths.place(Tile(20, 23), queue=True)
-    assert not ride.is_reachable()
+    game.paths.place(Tile(20, 17))
+    assert not ride.is_entrance_reachable()
+    assert not ride.is_exit_reachable()
 
 
 def test_entrance_not_reachable_queue_perpendicular(game):
-    """Queue placed along a path with entrance perpendicular has no edge toward entrance.
+    """Queue perpendicular to entrance has no edge facing it.
 
-    Reproduces: place queue, then paths on both sides (E-W). The queue gets
-    fenced on N/S. Then a ride entrance placed to the north can't connect
-    because the queue has no north edge.
+    Queue between two E-W paths gets fenced on N/S. Ride entrance to
+    the north can't connect because the queue has no north edge.
     """
     game.park.cheats.build_in_pause_mode()
 
-    # Build a horizontal path spine with a queue in the middle
     game.paths.place(Tile(19, 23))  # west path
     game.paths.place(Tile(20, 23), queue=True)  # queue
     game.paths.place(Tile(21, 23))  # east path
-    # Queue at (20, 23) now has E+W edges, fenced on N+S
 
-    # Place ride north of the queue: center (20, 20), entrance at (20, 22)
-    # The access tile for the entrance is (20, 23) — where the queue is
     ride = game.rides.place_flat_ride(
         obj=RideObjects.gentle.MERRY_GO_ROUND,
         tile=Tile(20, 20),
         entrance=Tile(20, 22),
         exit=Tile(18, 20),
     )
-
-    # The queue exists but has no north edge toward the entrance — NOT reachable
     assert not ride.is_entrance_reachable()
 
     # Exit just needs any adjacent path (no edge required)
     game.paths.place(Tile(17, 20))
+    assert not ride.is_exit_reachable()  # path exists but not connected to park
+
+
+def test_ride_reachable_from_park_entrance(game):
+    """Ride with paths connected to the park entrance is reachable."""
+    game.park.cheats.build_in_pause_mode()
+    ride = game.rides.place_flat_ride(
+        obj=RideObjects.gentle.MERRY_GO_ROUND,
+        tile=Tile(20, 20),
+        entrance=Tile(20, 22),
+        exit=Tile(20, 18),
+    )
+
+    # Connect entrance → park entrance
+    game.paths.place(Tile(20, 23), queue=True)
+    game.paths.place_line(Tile(20, 24), Tile(20, 30))
+    game.paths.place_line(Tile(20, 30), Tile(48, 30))
+    assert ride.is_entrance_reachable()
+    assert not ride.is_exit_reachable()
+
+    # Connect exit → park entrance
+    game.paths.place(Tile(20, 17))
+    game.paths.place_line(Tile(20, 16), Tile(20, 17))
+    game.paths.place_line(Tile(18, 17), Tile(20, 17))
+    game.paths.place_line(Tile(18, 17), Tile(18, 30))
+    game.paths.place_line(Tile(18, 30), Tile(48, 30))
     assert ride.is_exit_reachable()
 
-    # Overall not reachable because entrance is blocked
-    assert not ride.is_reachable()
 
-
-def test_ride_reachable_with_both_paths(game):
-    """Ride with entrance queue + exit path is reachable."""
-    game.park.cheats.build_in_pause_mode()
-    ride = game.rides.place_flat_ride(
-        obj=RideObjects.gentle.MERRY_GO_ROUND,
-        tile=Tile(20, 20),
-        entrance=Tile(20, 22),
-        exit=Tile(20, 18),
-    )
-    game.paths.place(Tile(20, 23), queue=True)
-    game.paths.place(Tile(20, 17))
-    assert ride.is_reachable()
-
-
-def test_ride_reachable_with_target(game):
-    """Ride reachable from a distant target tile via path network."""
-    game.park.cheats.build_in_pause_mode()
-    ride = game.rides.place_flat_ride(
-        obj=RideObjects.gentle.MERRY_GO_ROUND,
-        tile=Tile(20, 20),
-        entrance=Tile(20, 22),
-        exit=Tile(20, 18),
-    )
-    target = Tile(20, 30)
-
-    # Paths exist but not connected to target
-    game.paths.place(Tile(20, 23), queue=True)
-    game.paths.place(Tile(20, 17))
-    assert not ride.is_reachable(target)
-
-    # Connect entrance → target (straight south)
-    game.paths.place_line(Tile(20, 24), Tile(20, 30))
-    # Connect exit → target (south then east then south)
-    game.paths.place_line(Tile(20, 16), Tile(20, 17))  # extend exit path
-    game.paths.place_line(Tile(18, 17), Tile(20, 17))  # join west
-    game.paths.place_line(Tile(18, 17), Tile(18, 30))  # south corridor
-    game.paths.place_line(Tile(18, 30), Tile(20, 30))  # connect to target
-    assert ride.is_reachable(target)
-
-
-def test_stall_reachable(game):
-    """Stall facing a path is reachable."""
+def test_stall_not_reachable_without_path(game):
+    """Stall without a facing path is not reachable."""
     game.park.cheats.build_in_pause_mode()
     stall = game.rides.place_stall(
         RideObjects.stall.BURGER_BAR,
         Tile(20, 20),
         direction=Direction.SOUTH,
     )
-    assert not stall.is_reachable()
-
-    game.paths.place(Tile(20, 21))
-    assert stall.is_reachable()
+    assert not stall.is_stall_reachable()
 
 
 def test_stall_facing_wrong_way(game):
@@ -268,7 +245,7 @@ def test_stall_facing_wrong_way(game):
         Tile(20, 20),
         direction=Direction.NORTH,
     )
-    assert not stall.is_reachable()
+    assert not stall.is_stall_reachable()
 
 
 # ── Integration tests ────────────────────────────────────────────────
