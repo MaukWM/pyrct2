@@ -14,9 +14,14 @@ from pyrct2.park._marketing import MarketingProxy
 from pyrct2.park._research import ResearchProxy
 from pyrct2.park._staff import StaffProxy
 from pyrct2.result import ActionResult
+from pyrct2.world._tile import Tile
 
 if TYPE_CHECKING:
     from pyrct2.client import RCT2
+
+# EntranceElement.object values (from C++ EntranceElement.h):
+# 0 = ride entrance, 1 = ride exit, 2 = park entrance
+_PARK_ENTRANCE_OBJECT = 2
 
 
 class ParkProxy:
@@ -32,6 +37,7 @@ class ParkProxy:
 
     def __init__(self, client: RCT2) -> None:
         self._client = client
+        self._park_entrance_tiles = self._find_park_entrance_tiles()
         self.cheats = CheatsProxy(client)
         self.climate = ClimateProxy(client)
         self.finance = FinanceProxy(client)
@@ -39,6 +45,21 @@ class ParkProxy:
         self.marketing = MarketingProxy(client)
         self.research = ResearchProxy(client)
         self.staff = StaffProxy(client)
+
+    def _find_park_entrance_tiles(self) -> list[Tile]:
+        bounds = self._client.world.get_bounds()
+        tiles = self._client.world.get_tiles(Tile(0, 0), Tile(bounds.x - 1, bounds.y - 1))
+        return [
+            Tile(t.x, t.y)
+            for t in tiles
+            for e in t.entrances
+            if e.object == _PARK_ENTRANCE_OBJECT and e.sequence == 0
+        ]
+
+    @property
+    def park_entrance_tiles(self) -> list[Tile]:
+        """Park entrance gate locations (computed once at init, never changes)."""
+        return list(self._park_entrance_tiles)
 
     # -- Read properties
 
