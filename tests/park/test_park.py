@@ -6,6 +6,8 @@ named "Test Park", closed, rating 0, value 0, starting year 1 month 0 day 1.
 
 import pytest
 
+from pyrct2.world import Tile
+
 
 def test_park_name(game):
     assert game.park.name == "Test Park"
@@ -41,6 +43,26 @@ def test_open_close(game):
     assert game.park.is_open is True
     game.park.close()
     assert game.park.is_open is False
+
+
+# ── Park entrances ───────────────────────────────────────────────────
+
+
+def test_park_entrance(game):
+    """Test scenario has one park entrance with expected tiles and arrival tile."""
+    entrances = game.park.entrances
+    assert len(entrances) == 1
+
+    entrance = entrances[0]
+    assert len(entrance.tiles) == 3
+    assert Tile(49, 30) in entrance.tiles
+    assert Tile(49, 29) in entrance.tiles
+    assert Tile(49, 31) in entrance.tiles
+
+    # arrival_tile is the owned tile just inside the gate
+    assert entrance.arrival_tile == Tile(48, 30)
+    td = game.world.get_tile(entrance.arrival_tile)
+    assert td.surface.hasOwnership is True
 
 
 @pytest.mark.xfail(

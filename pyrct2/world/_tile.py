@@ -12,9 +12,19 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
+from pyrct2._generated.enums import Direction
+
 # World units per tile — hardcoded in OpenRCT2 as kCoordsXYStep, unchanged since original RCT2.
 # See: https://github.com/OpenRCT2/OpenRCT2/blob/develop/src/openrct2/world/MapLimits.h
 TILE_SIZE: int = 32
+
+# Direction → (dx, dy) for cardinal tile neighbor lookups.
+DIR_DELTA: dict[Direction, tuple[int, int]] = {
+    Direction.WEST: (-1, 0),
+    Direction.NORTH: (0, -1),
+    Direction.EAST: (1, 0),
+    Direction.SOUTH: (0, 1),
+}
 
 
 class Tile(BaseModel):

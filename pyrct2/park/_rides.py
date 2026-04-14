@@ -22,19 +22,10 @@ from pyrct2._generated.objects import RIDE_TYPE_TRACK_ELEMS, RideObjectInfo
 from pyrct2._generated.state import Ride
 from pyrct2.errors import ActionError, QueryError
 from pyrct2.result import ActionResult
-from pyrct2.world._tile import TILE_SIZE, Tile
+from pyrct2.world._tile import DIR_DELTA, TILE_SIZE, Tile
 
 if TYPE_CHECKING:
     from pyrct2.client import RCT2
-
-
-# Direction → (dx, dy) for tile neighbor lookups.
-_DIR_DELTA = {
-    Direction.WEST: (-1, 0),
-    Direction.NORTH: (0, -1),
-    Direction.EAST: (1, 0),
-    Direction.SOUTH: (0, 1),
-}
 
 # Direction → EdgeBit. The edge a path needs to connect in that direction.
 _DIR_EDGE = {
@@ -70,13 +61,13 @@ def _access_path_tile(access: StationAccess, client: RCT2, ride_id: int) -> tupl
     not true facing). Instead, find the neighbor with track belonging to
     this ride, then the path tile is on the opposite side.
     """
-    for d, (dx, dy) in _DIR_DELTA.items():
+    for d, (dx, dy) in DIR_DELTA.items():
         neighbor = Tile(access.tile.x + dx, access.tile.y + dy)
         td = client.world.get_tile(neighbor)
         if any(t.ride == ride_id for t in td.tracks):
             # Path is on the opposite side from the ride
             opposite = Direction((d + 2) % 4)
-            odx, ody = _DIR_DELTA[opposite]
+            odx, ody = DIR_DELTA[opposite]
             path_tile = Tile(access.tile.x + odx, access.tile.y + ody)
             # Path needs an edge pointing back toward the entrance
             required_edge = _DIR_EDGE[d]
@@ -99,7 +90,7 @@ def _entrance_direction(access_tile: Tile, footprint: set[Tile], ride_direction:
     Rule: if toward-ride is odd (N=1 or S=3), use opposite.
           If toward-ride is even (W=0 or E=2), use same.
     """
-    for d, (dx, dy) in _DIR_DELTA.items():
+    for d, (dx, dy) in DIR_DELTA.items():
         neighbor = Tile(access_tile.x + dx, access_tile.y + dy)
         if neighbor in footprint:
             # d = direction from entrance toward ride
@@ -253,7 +244,7 @@ class RideEntity(EntityBase):
         d = self.direction
         if d is None:
             return None, EdgeBit(0)
-        dx, dy = _DIR_DELTA[d]
+        dx, dy = DIR_DELTA[d]
         tile = Tile(self.placement_tile.x + dx, self.placement_tile.y + dy)
         opposite = Direction((d + 2) % 4)
         return tile, _DIR_EDGE[opposite]

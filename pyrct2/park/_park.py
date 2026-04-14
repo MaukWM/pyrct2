@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pydantic import BaseModel, ConfigDict
+
 from pyrct2._generated.enums import ParkParameter
 from pyrct2._generated.state import GameDate, ScenarioObjective
 from pyrct2.park._cheats import CheatsProxy
@@ -14,7 +16,7 @@ from pyrct2.park._marketing import MarketingProxy
 from pyrct2.park._research import ResearchProxy
 from pyrct2.park._staff import StaffProxy
 from pyrct2.result import ActionResult
-from pyrct2.world._tile import Tile
+from pyrct2.world._tile import DIR_DELTA, Tile
 
 if TYPE_CHECKING:
     from pyrct2.client import RCT2
@@ -22,6 +24,21 @@ if TYPE_CHECKING:
 # EntranceElement.object values (from C++ EntranceElement.h):
 # 0 = ride entrance, 1 = ride exit, 2 = park entrance
 _PARK_ENTRANCE_OBJECT = 2
+
+
+class ParkEntrance(BaseModel):
+    """A park entrance gate.
+
+    Park entrances span 3 tiles (center + 2 sides) and have no footpath
+    on them. ``arrival_tile`` is the owned tile just inside the gate —
+    the first tile guests step onto when entering the park. It should
+    have a path on it, but that's not guaranteed (paths can be removed).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    tiles: list[Tile]
+    arrival_tile: Tile
 
 
 class ParkProxy:
@@ -37,7 +54,7 @@ class ParkProxy:
 
     def __init__(self, client: RCT2) -> None:
         self._client = client
-        self._park_entrance_tiles = self._find_park_entrance_tiles()
+        self._entrances = self._find_entrances()
         self.cheats = CheatsProxy(client)
         self.climate = ClimateProxy(client)
         self.finance = FinanceProxy(client)
@@ -46,20 +63,42 @@ class ParkProxy:
         self.research = ResearchProxy(client)
         self.staff = StaffProxy(client)
 
-    def _find_park_entrance_tiles(self) -> list[Tile]:
+    def _find_entrances(self) -> list[ParkEntrance]:
+        """Scan the map once at init to find all park entrance gates."""
         bounds = self._client.world.get_bounds()
-        tiles = self._client.world.get_tiles(Tile(0, 0), Tile(bounds.x - 1, bounds.y - 1))
-        return [
-            Tile(t.x, t.y)
-            for t in tiles
-            for e in t.entrances
-            if e.object == _PARK_ENTRANCE_OBJECT and e.sequence == 0
-        ]
+        all_tiles = self._client.world.get_tiles(Tile(0, 0), Tile(bounds.x - 1, bounds.y - 1))
+
+        # Index every park-entrance element by tile.
+        entrance_elems: dict[Tile, list[tuple[int, int]]] = {}  # tile → [(seq, direction)]
+        for t in all_tiles:
+            for e in t.entrances:
+                if e.object == _PARK_ENTRANCE_OBJECT:
+                    tile = Tile(t.x, t.y)
+                    entrance_elems.setdefault(tile, []).append((e.sequence, e.direction))
+
+        # Each park entrance spans 3 tiles. The EntranceElement.sequence
+        # field identifies which part: 0 = center, 1 and 2 = sides.
+        # Build one ParkEntrance per center tile.
+        result: list[ParkEntrance] = []
+        for tile, elems in entrance_elems.items():
+            for seq, direction in elems:
+                if seq != 0:
+                    continue
+                # Collect the 3 tiles: center + neighbors that are also park entrances.
+                tiles = [tile] + [
+                    t for t in entrance_elems if t != tile and tile.distance_to(t) == 1
+                ]
+                dx, dy = DIR_DELTA[direction]
+                result.append(ParkEntrance(
+                    tiles=tiles,
+                    arrival_tile=Tile(tile.x + dx, tile.y + dy),
+                ))
+        return result
 
     @property
-    def park_entrance_tiles(self) -> list[Tile]:
-        """Park entrance gate locations (computed once at init, never changes)."""
-        return list(self._park_entrance_tiles)
+    def entrances(self) -> list[ParkEntrance]:
+        """Park entrance gates (computed once at init, never changes)."""
+        return list(self._entrances)
 
     # -- Read properties
 

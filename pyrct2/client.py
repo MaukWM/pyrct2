@@ -51,9 +51,9 @@ class RCT2:
         self._instance = instance
         self.actions = ActionsProxy(self)
         self.state = StateProxy(self)
+        self.world = WorldProxy(self)
         self.park = ParkProxy(self)
         self.paths = PathsProxy(self)
-        self.world = WorldProxy(self)
         self.objects = ObjectsProxy(self)
         self.rides = RidesProxy(self)
 
