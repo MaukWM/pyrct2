@@ -254,10 +254,7 @@ class RideEntity(EntityBase):
     def _is_connected_to_park_entrance(self, tile: Tile) -> bool:
         """BFS from tile to any park entrance arrival tile."""
         entrances = self._client.park.entrances
-        return any(
-            self._client.paths.is_connected(tile, e.arrival_tile)
-            for e in entrances
-        )
+        return any(self._client.paths.is_connected(tile, e.arrival_tile) for e in entrances)
 
     def _ride_path_info(self, access: StationAccess | None) -> tuple[Tile, EdgeBit] | None:
         """Find the path tile + required edge for a ride entrance/exit."""

@@ -16,14 +16,11 @@ from pyrct2.park._marketing import MarketingProxy
 from pyrct2.park._research import ResearchProxy
 from pyrct2.park._staff import StaffProxy
 from pyrct2.result import ActionResult
+from pyrct2._generated.enums import Direction
 from pyrct2.world._tile import DIR_DELTA, Tile
 
 if TYPE_CHECKING:
     from pyrct2.client import RCT2
-
-# EntranceElement.object values (from C++ EntranceElement.h):
-# 0 = ride entrance, 1 = ride exit, 2 = park entrance
-_PARK_ENTRANCE_OBJECT = 2
 
 
 class ParkEntrance(BaseModel):
@@ -64,35 +61,37 @@ class ParkProxy:
         self.staff = StaffProxy(client)
 
     def _find_entrances(self) -> list[ParkEntrance]:
-        """Scan the map once at init to find all park entrance gates."""
-        bounds = self._client.world.get_bounds()
-        all_tiles = self._client.world.get_tiles(Tile(0, 0), Tile(bounds.x - 1, bounds.y - 1))
+        """Query the bridge for park entrance gates.
 
-        # Index every park-entrance element by tile.
-        entrance_elems: dict[Tile, list[tuple[int, int]]] = {}  # tile → [(seq, direction)]
-        for t in all_tiles:
-            for e in t.entrances:
-                if e.object == _PARK_ENTRANCE_OBJECT:
-                    tile = Tile(t.x, t.y)
-                    entrance_elems.setdefault(tile, []).append((e.sequence, e.direction))
+        Uses get_elements_by_type to fetch only entrance elements, then
+        groups them into ParkEntrance objects on the Python side.
+        """
+        park_entrance_object = 2
+        raw = self._client.world.get_elements_by_type("entrance")
 
-        # Each park entrance spans 3 tiles. The EntranceElement.sequence
-        # field identifies which part: 0 = center, 1 and 2 = sides.
-        # Build one ParkEntrance per center tile.
+        # Index park-entrance elements by tile coordinate.
+        by_tile: dict[tuple[int, int], list[tuple[int, Direction]]] = {}
+        for e in raw:
+            if e.get("object") == park_entrance_object:
+                key = (e["tileX"], e["tileY"])
+                by_tile.setdefault(key, []).append((e["sequence"], Direction(e["direction"])))
+
+        # Build one ParkEntrance per center tile (sequence 0).
         result: list[ParkEntrance] = []
-        for tile, elems in entrance_elems.items():
+        for (tx, ty), elems in by_tile.items():
             for seq, direction in elems:
                 if seq != 0:
                     continue
-                # Collect the 3 tiles: center + neighbors that are also park entrances.
-                tiles = [tile] + [
-                    t for t in entrance_elems if t != tile and tile.distance_to(t) == 1
+                tiles = [Tile(tx, ty)] + [
+                    Tile(*k) for k in by_tile if k != (tx, ty) and abs(k[0] - tx) + abs(k[1] - ty) == 1
                 ]
                 dx, dy = DIR_DELTA[direction]
-                result.append(ParkEntrance(
-                    tiles=tiles,
-                    arrival_tile=Tile(tile.x + dx, tile.y + dy),
-                ))
+                result.append(
+                    ParkEntrance(
+                        tiles=tiles,
+                        arrival_tile=Tile(tx + dx, ty + dy),
+                    )
+                )
         return result
 
     @property
