@@ -123,13 +123,29 @@ class WorldProxy:
             for t in raw_tiles
         ]
 
+    def get_elements_by_type(self, element_type: str) -> list[dict]:
+        """Fetch all tile elements of a given type across the map.
+
+        Returns a flat list of raw element dicts, each with ``tileX``/``tileY``
+        fields identifying which tile the element belongs to.  Much faster than
+        ``get_tiles`` for sparse element types (entrance, footpath, track, …).
+
+        TODO: Change element_type to be an ENUM.
+
+        Args:
+            element_type: One of the 8 OpenRCT2 tile element types
+                (``"surface"``, ``"footpath"``, ``"track"``, ``"small_scenery"``,
+                ``"wall"``, ``"entrance"``, ``"large_scenery"``, ``"banner"``).
+        """
+        return self._client._query("get_elements_by_type", {"type": element_type})
+
     def get_paths(self) -> dict[tuple[int, int], list[FootpathElement]]:
         """Fetch all footpath elements on the map.
 
         Returns a dict keyed by ``(tile_x, tile_y)`` → list of path elements.
         Only tiles that have paths are included.
         """
-        raw_paths = self._client._query("get_paths")
+        raw_paths = self.get_elements_by_type("footpath")
         result: dict[tuple[int, int], list[FootpathElement]] = {}
         for p in raw_paths:
             elem = FootpathElement.model_validate(p)
