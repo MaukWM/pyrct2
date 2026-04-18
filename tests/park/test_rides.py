@@ -287,6 +287,32 @@ def test_stall_facing_wrong_way(game):
     assert not stall.is_stall_reachable()
 
 
+def test_stall_reachable_from_park_entrance(game):
+    """Stall facing a path connected to the park entrance is reachable.
+
+    Uses Direction.SOUTH because C++ and pyrct2 have N/S naming inverted:
+    pyrct2 SOUTH (3) → C++ stores 3 → C++ Y-decreasing → visual north.
+    So the stall faces north (toward y-1) where the path is.
+    """
+    game.park.cheats.build_in_pause_mode()
+
+    # Stall at (20, 20), facing visual north (toward y=19)
+    stall = game.rides.place_stall(
+        RideObjects.stall.BURGER_BAR,
+        Tile(20, 20),
+        direction=Direction.SOUTH,  # C++ Y-decreasing = visual north
+    )
+
+    # Path at the facing tile, routed around the stall to the park entrance.
+    # Can't go straight south from (20,19) — the stall at (20,20) blocks it.
+    game.paths.place(Tile(20, 19))
+    game.paths.place_line(Tile(20, 19), Tile(21, 19))
+    game.paths.place_line(Tile(21, 19), Tile(21, 30))
+    game.paths.place_line(Tile(21, 30), Tile(48, 30))
+
+    assert stall.is_stall_reachable()
+
+
 # ── Integration tests ────────────────────────────────────────────────
 
 

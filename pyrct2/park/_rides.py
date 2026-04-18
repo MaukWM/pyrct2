@@ -207,8 +207,10 @@ class RideEntity(EntityBase):
     def is_stall_reachable(self) -> bool:
         """Whether this stall is reachable from a park entrance.
 
-        Checks that the facing tile has a connected path AND that it
-        connects to any park entrance via the path network.
+        Checks that the facing tile has a path AND that it connects to
+        any park entrance via the path network. Unlike ride entrances,
+        stalls don't require a specific path edge — the C++ shop
+        connection mechanism handles stall-to-path linking internally.
 
         Returns False for rides (use is_entrance_reachable / is_exit_reachable).
 
@@ -219,8 +221,8 @@ class RideEntity(EntityBase):
         """
         if self.entrance is not None:
             return False
-        tile, edge = self._stall_path_info()
-        if tile is None or not self._has_path_at(tile, edge):
+        tile, _edge = self._stall_path_info()
+        if tile is None or not self._has_path_at(tile):
             return False
         return self._is_connected_to_park_entrance(tile)
 
@@ -254,10 +256,7 @@ class RideEntity(EntityBase):
     def _is_connected_to_park_entrance(self, tile: Tile) -> bool:
         """BFS from tile to any park entrance arrival tile."""
         entrances = self._client.park.entrances
-        return any(
-            self._client.paths.is_connected(tile, e.arrival_tile)
-            for e in entrances
-        )
+        return any(self._client.paths.is_connected(tile, e.arrival_tile) for e in entrances)
 
     def _ride_path_info(self, access: StationAccess | None) -> tuple[Tile, EdgeBit] | None:
         """Find the path tile + required edge for a ride entrance/exit."""
@@ -270,9 +269,13 @@ class RideEntity(EntityBase):
         d = self.direction
         if d is None:
             return None, EdgeBit(0)
-        dx, dy = DIR_DELTA[d]
+        # Stored track direction uses C++ convention where NORTH(1)=Y+
+        # and SOUTH(3)=Y-. pyrct2's DIR_DELTA has the opposite for N/S.
+        # Invert odd directions (same fix as _entrance_direction).
+        d_visual = Direction((d + 2) % 4) if d % 2 == 1 else d
+        dx, dy = DIR_DELTA[d_visual]
         tile = Tile(self.placement_tile.x + dx, self.placement_tile.y + dy)
-        opposite = Direction((d + 2) % 4)
+        opposite = Direction((d_visual + 2) % 4)
         return tile, _DIR_EDGE[opposite]
 
     def refresh(self) -> None:

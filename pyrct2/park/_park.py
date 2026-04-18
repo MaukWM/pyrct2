@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict
 
-from pyrct2._generated.enums import ParkParameter
+from pyrct2._generated.enums import Direction, ParkParameter
 from pyrct2._generated.state import GameDate, ScenarioObjective
 from pyrct2.park._cheats import CheatsProxy
 from pyrct2.park._climate import ClimateProxy
@@ -85,14 +85,14 @@ class ParkProxy:
                 if seq != 0:
                     continue
                 # Collect the 3 tiles: center + neighbors that are also park entrances.
-                tiles = [tile] + [
-                    t for t in entrance_elems if t != tile and tile.distance_to(t) == 1
-                ]
-                dx, dy = DIR_DELTA[direction]
-                result.append(ParkEntrance(
-                    tiles=tiles,
-                    arrival_tile=Tile(tile.x + dx, tile.y + dy),
-                ))
+                tiles = [tile] + [t for t in entrance_elems if t != tile and tile.distance_to(t) == 1]
+                dx, dy = DIR_DELTA[Direction(direction)]
+                result.append(
+                    ParkEntrance(
+                        tiles=tiles,
+                        arrival_tile=Tile(tile.x + dx, tile.y + dy),
+                    )
+                )
         return result
 
     @property
