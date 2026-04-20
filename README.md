@@ -117,3 +117,7 @@ game.state.guests()                        # list[Guest] — every guest in the 
 
 - Python 3.11+
 - [OpenRCT2](https://openrct2.io/) installed with RCT2 game data
+
+## OpenRCT2 version compatibility
+
+pyrct2 officially targets **OpenRCT2 v0.5.0**. Older versions may work but mileage may vary — development started on v0.4.32 so support starts from that version.
