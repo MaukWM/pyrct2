@@ -454,25 +454,31 @@ class RidesProxy:
         footprint_set = set(footprint)
         adjacent = _adjacent_tiles(footprint_set)
 
+        valid_tiles = sorted((t.x, t.y) for t in adjacent)
+
         if entrance in footprint_set:
             raise ValueError(
                 f"Entrance {entrance} is inside the ride footprint. "
-                f"Place it on a tile adjacent to the footprint edge, not on top of it."
+                f"Place it on a tile adjacent to the footprint edge, not on top of it. "
+                f"Valid tiles: {valid_tiles}"
             )
         if entrance not in adjacent:
             raise ValueError(
                 f"Entrance {entrance} is not adjacent to the ride footprint. "
-                f"Place it on a tile directly next to (not diagonal to) the footprint edge."
+                f"Place it on a tile directly next to (not diagonal to) the footprint edge. "
+                f"Valid tiles: {valid_tiles}"
             )
         if exit in footprint_set:
             raise ValueError(
                 f"Exit {exit} is inside the ride footprint. "
-                f"Place it on a tile adjacent to the footprint edge, not on top of it."
+                f"Place it on a tile adjacent to the footprint edge, not on top of it. "
+                f"Valid tiles: {valid_tiles}"
             )
         if exit not in adjacent:
             raise ValueError(
                 f"Exit {exit} is not adjacent to the ride footprint. "
-                f"Place it on a tile directly next to (not diagonal to) the footprint edge."
+                f"Place it on a tile directly next to (not diagonal to) the footprint edge. "
+                f"Valid tiles: {valid_tiles}"
             )
         # Pre-check: entrance/exit tiles must have only a surface element
         for label, t in [("Entrance", entrance), ("Exit", exit)]:
