@@ -455,14 +455,6 @@ class TrackedRideEntity(RideEntity):
             is_from_track_design=False,
         )
 
-        # Update state from enriched response (track_place raises on failure,
-        # so we only reach here on success)
-        cursor_data = resp["cursor"]
-        self._end_slope = resp["endSlope"]
-        self._end_bank = resp["endBank"]
-        self._valid_next = [TrackElemType(v) for v in resp["validNext"]]
-        self._begin_z_lookup = resp["beginZMap"]
-
         # Record placed piece for undo (at placement z, not cursor z)
         self._pieces.append(
             PlacedPiece(
@@ -474,12 +466,24 @@ class TrackedRideEntity(RideEntity):
             )
         )
 
+        # Update state from enriched response (track_place raises on failure,
+        # so we only reach here on success)
+        cursor_data = resp["cursor"]
+        if cursor_data is None:
+            raise RuntimeError(
+                f"Bridge enrichment failed after placing {track_type.name}: "
+                f"cursor is null. Error: {resp.get('enrichmentError', 'unknown')}"
+            )
         self._cursor = CursorPosition(
             x=cursor_data["x"],
             y=cursor_data["y"],
             z=cursor_data["z"],
             direction=Direction(cursor_data["direction"]),
         )
+        self._end_slope = resp["endSlope"]
+        self._end_bank = resp["endBank"]
+        self._valid_next = [TrackElemType(v) for v in resp["validNext"]]
+        self._begin_z_lookup = resp["beginZMap"]
 
         result = TrackPlaceResult(
             cost=resp.get("cost", 0),
@@ -621,7 +625,8 @@ class TrackedRideEntity(RideEntity):
             station_tiles.add(Tile.from_world(piece.x, piece.y))
 
         # Use the flat-ride entrance direction logic
-        return _entrance_direction(tile, station_tiles, self._pieces[0].direction)
+        # Station pieces always have cardinal direction (0-3)
+        return _entrance_direction(tile, station_tiles, Direction(self._pieces[0].direction))
 
     def _check_circuit(self) -> None:
         """Check circuit completion via bridge track_get_state.
