@@ -8,7 +8,7 @@ from pyrct2.park._marketing import MarketingProxy
 from pyrct2.park._park import ParkEntrance, ParkProxy
 from pyrct2.park._paths import LineResult, PathsProxy
 from pyrct2.park._research import ResearchProxy
-from pyrct2.park._rides import RideEntity, RidesProxy, StationAccess
+from pyrct2.park._rides import RideEntity, RidesProxy, StationAccess, TrackedRideEntity
 from pyrct2.park._staff import StaffEntity, StaffProxy
 
 __all__ = [
@@ -29,4 +29,5 @@ __all__ = [
     "StaffEntity",
     "StaffProxy",
     "StationAccess",
+    "TrackedRideEntity",
 ]

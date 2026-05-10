@@ -1,4 +1,4 @@
-"""RidesProxy and RideEntity — ride queries, placement, and management."""
+"""RidesProxy, RideEntity, and TrackedRideEntity — ride queries, placement, and management."""
 
 from __future__ import annotations
 
@@ -18,10 +18,16 @@ from pyrct2._generated.enums import (
     TrackElemType,
 )
 from pyrct2._entity import EntityBase
-from pyrct2._generated.objects import RIDE_TYPE_TRACK_ELEMS, RideObjectInfo
+from pyrct2._generated.objects import RIDE_TYPE_STR_TO_INT, RIDE_TYPE_TRACK_ELEMS, RideObjectInfo
 from pyrct2._generated.state import Ride
 from pyrct2.errors import ActionError, QueryError
-from pyrct2.result import ActionResult
+from pyrct2.result import (
+    ActionResult,
+    CursorPosition,
+    PlacedPiece,
+    TrackPlaceResult,
+    TrackRemoveResult,
+)
 from pyrct2.world._tile import DIR_DELTA, TILE_SIZE, Tile
 
 if TYPE_CHECKING:
@@ -366,6 +372,303 @@ class RideEntity(EntityBase):
         )
 
 
+class TrackedRideEntity(RideEntity):
+    """Ride entity with track building capabilities.
+
+    Created by ``game.rides.create_tracked_ride()``. Maintains cursor state
+    so each ``.place()`` call knows where to put the next piece. The bridge
+    is stateless — it returns cursor + validNext per placement, and pyrct2
+    tracks the full piece history for undo support.
+    """
+
+    def __init__(
+        self,
+        client: RCT2,
+        model: Ride,
+        ride_type: RideType,
+        cursor: CursorPosition,
+        valid_next: list[TrackElemType],
+        pieces: list[PlacedPiece],
+        end_slope: int = 0,
+        end_bank: int = 0,
+    ) -> None:
+        super().__init__(client, model)
+        self._ride_type = ride_type
+        self._cursor = cursor
+        self._valid_next = valid_next
+        self._pieces = list(pieces)
+        self._end_slope = end_slope
+        self._end_bank = end_bank
+        self._circuit_complete = False
+        # Number of station pieces (protected from undo)
+        self._station_piece_count = len(pieces)
+        # beginZ lookup for valid next types (populated from bridge beginZMap)
+        self._begin_z_lookup: dict = {}
+
+    def __repr__(self) -> str:
+        return (
+            f"TrackedRideEntity(#{self.data.id} {self.data.name!r} "
+            f"pieces={len(self._pieces)} circuit={self._circuit_complete})"
+        )
+
+    # ── Track building ──────────────────────────────────────────────
+
+    def place(
+        self,
+        track_type: TrackElemType,
+        *,
+        chain_lift: bool = False,
+    ) -> TrackPlaceResult:
+        """Place the next track piece at the current cursor position.
+
+        Args:
+            track_type: The track element to place (e.g. TrackElemType.FLAT).
+            chain_lift: Whether to enable chain lift on this piece.
+
+        Returns:
+            Result with cost, new cursor position, and valid next pieces.
+
+        Raises:
+            ActionError: If the game rejects the placement.
+        """
+        flags = SelectedLiftAndInverted(0)
+        if chain_lift:
+            flags = SelectedLiftAndInverted.LIFT_HILL
+
+        # Cursor z is the connection height. trackplace expects baseZ.
+        # baseZ = connectionZ - beginZ (per TrackDesign.cpp:1617).
+        begin_z = self._begin_z_lookup.get(str(int(track_type)), 0)
+        placement_z = self._cursor.z - begin_z
+
+        resp = self._client.actions.track_place(
+            x=self._cursor.x,
+            y=self._cursor.y,
+            z=placement_z,
+            direction=self._cursor.direction,
+            ride=self._id,
+            track_type=track_type,
+            ride_type=self._ride_type,
+            brake_speed=0,
+            colour=0,
+            seat_rotation=4,
+            track_place_flags=flags,
+            is_from_track_design=False,
+        )
+
+        # Update state from enriched response (track_place raises on failure,
+        # so we only reach here on success)
+        cursor_data = resp["cursor"]
+        self._end_slope = resp["endSlope"]
+        self._end_bank = resp["endBank"]
+        self._valid_next = [TrackElemType(v) for v in resp["validNext"]]
+        self._begin_z_lookup = resp["beginZMap"]
+
+        # Record placed piece for undo (at placement z, not cursor z)
+        self._pieces.append(
+            PlacedPiece(
+                track_type=track_type,
+                x=self._cursor.x,
+                y=self._cursor.y,
+                z=placement_z,
+                direction=self._cursor.direction,
+            )
+        )
+
+        self._cursor = CursorPosition(
+            x=cursor_data["x"],
+            y=cursor_data["y"],
+            z=cursor_data["z"],
+            direction=Direction(cursor_data["direction"]),
+        )
+
+        result = TrackPlaceResult(
+            cost=resp.get("cost", 0),
+            position=self._cursor,
+            valid_next=self._valid_next,
+            end_slope=self._end_slope,
+            end_bank=self._end_bank,
+        )
+
+        # TODO: Consider making circuit_complete a lazy property instead of
+        # checking on every placement. The local check is cheap but still
+        # runs on every place() call.
+        self._check_circuit()
+
+        return result
+
+    def undo(self, n: int = 1) -> list[TrackRemoveResult]:
+        """Remove the last N placed track pieces.
+
+        Protects station pieces — cannot undo past the first station piece
+        (beginStation). To relocate a ride, use ``.demolish()`` and recreate.
+
+        Args:
+            n: Number of pieces to remove (default 1).
+
+        Returns:
+            List of removal results (one per piece removed).
+
+        Raises:
+            ValueError: If n would remove station pieces.
+            ActionError: If the game rejects the removal.
+        """
+        removable = len(self._pieces) - self._station_piece_count
+        if n > removable:
+            raise ValueError(
+                f"Cannot undo {n} pieces — only {removable} non-station pieces placed. "
+                f"Station pieces ({self._station_piece_count}) are protected."
+            )
+
+        results = []
+        for _ in range(n):
+            piece = self._pieces.pop()
+            resp = self._client.actions.track_remove(
+                x=piece.x,
+                y=piece.y,
+                z=piece.z,
+                direction=piece.direction,
+                track_type=piece.track_type,
+                sequence=0,
+            )
+            cost = resp.get("payload", {}).get("cost", 0) if resp.get("success") else 0
+            results.append(TrackRemoveResult(track_type=piece.track_type, cost=cost))
+
+        # Resync cursor from bridge after undo
+        self._resync_from_bridge()
+        self._circuit_complete = False
+
+        return results
+
+    # ── State properties ────────────────────────────────────────────
+
+    @property
+    def position(self) -> CursorPosition:
+        """Current cursor position — where the next piece will be placed."""
+        return self._cursor
+
+    @property
+    def valid_next(self) -> list[TrackElemType]:
+        """Track element types that can be placed at the current cursor."""
+        return list(self._valid_next)
+
+    @property
+    def pieces(self) -> list[PlacedPiece]:
+        """All placed track pieces (including station), in placement order."""
+        return list(self._pieces)
+
+    @property
+    def circuit_complete(self) -> bool:
+        """Whether the track forms a complete circuit back to the station."""
+        return self._circuit_complete
+
+    # ── Entrance / exit ─────────────────────────────────────────────
+
+    def place_entrance(self, tile: Tile, station: int = 0) -> ActionResult:
+        """Place a ride entrance on the given tile.
+
+        Args:
+            tile: The tile for the entrance (must be adjacent to a station piece).
+            station: Station index (default 0, most rides have one station).
+
+        TODO: Add defensive checks like place_flat_ride — validate tile is not
+        on a station piece, is adjacent to one, and is clear of other elements.
+        Currently relies on _entrance_exit_direction (adjacency) + game ActionError.
+        """
+        direction = self._entrance_exit_direction(tile)
+        return ActionResult.from_response(
+            self._client.actions.ride_entrance_exit_place(
+                x=tile.x * TILE_SIZE,
+                y=tile.y * TILE_SIZE,
+                direction=direction,
+                ride=self._id,
+                station=station,
+                is_exit=False,
+            )
+        )
+
+    def place_exit(self, tile: Tile, station: int = 0) -> ActionResult:
+        """Place a ride exit on the given tile.
+
+        Args:
+            tile: The tile for the exit (must be adjacent to a station piece).
+            station: Station index (default 0, most rides have one station).
+
+        TODO: Add defensive checks like place_flat_ride (see place_entrance).
+        """
+        direction = self._entrance_exit_direction(tile)
+        return ActionResult.from_response(
+            self._client.actions.ride_entrance_exit_place(
+                x=tile.x * TILE_SIZE,
+                y=tile.y * TILE_SIZE,
+                direction=direction,
+                ride=self._id,
+                station=station,
+                is_exit=True,
+            )
+        )
+
+    # ── Private helpers ─────────────────────────────────────────────
+
+    def _entrance_exit_direction(self, tile: Tile) -> Direction:
+        """Compute the placement direction for an entrance/exit tile.
+
+        Looks at station pieces to find one adjacent to the given tile,
+        then derives the correct direction using the same empirical rule
+        as flat rides.
+        """
+        station_tiles: set[Tile] = set()
+        for piece in self._pieces[: self._station_piece_count]:
+            station_tiles.add(Tile.from_world(piece.x, piece.y))
+
+        # Use the flat-ride entrance direction logic
+        return _entrance_direction(tile, station_tiles, self._pieces[0].direction)
+
+    def _check_circuit(self) -> None:
+        """Check circuit completion via bridge track_get_state.
+
+        Only queries the bridge when the cursor returns to the station's
+        position and direction (cheap local check). The bridge walk is O(n)
+        on piece count so we avoid it on every placement.
+        """
+        # Quick local check: cursor must match station entry
+        first = self._pieces[0]
+        if (
+            self._cursor.x != first.x
+            or self._cursor.y != first.y
+            or self._cursor.z != first.z
+            or self._cursor.direction != first.direction
+        ):
+            self._circuit_complete = False
+            return
+
+        # Cursor matches station — confirm with bridge walk
+        state = self._client.execute(
+            "track_get_state",
+            {"ride": self._id, "rideType": int(self._ride_type)},
+        )
+        self._circuit_complete = state["payload"]["circuitComplete"]
+
+    def _resync_from_bridge(self) -> None:
+        """Resync cursor and valid_next from bridge after undo."""
+        state = self._client.execute(
+            "track_get_state",
+            {"ride": self._id, "rideType": int(self._ride_type)},
+        )
+        payload = state["payload"]
+        cursor_data = payload.get("cursor")
+        if cursor_data:
+            self._cursor = CursorPosition(
+                x=cursor_data["x"],
+                y=cursor_data["y"],
+                z=cursor_data["z"],
+                direction=Direction(cursor_data["direction"]),
+            )
+        self._valid_next = [TrackElemType(v) for v in payload.get("validNext", [])]
+        self._end_slope = payload.get("endSlope", 0)
+        self._end_bank = payload.get("endBank", 0)
+        self._begin_z_lookup = payload.get("beginZMap", {})
+
+
 class RidesProxy:
     """Ride queries, placement, and management: ``game.rides``."""
 
@@ -561,6 +864,148 @@ class RidesProxy:
             raise RuntimeError(f"Placed stall (id={ride_id}) not found after creation")
         return ride
 
+    def create_tracked_ride(
+        self,
+        obj: RideObjectInfo,
+        station_origin: Tile,
+        station_length: int = 3,
+        direction: Direction = Direction.NORTH,
+        height: int | None = None,
+    ) -> TrackedRideEntity:
+        """Create a tracked ride with station placed and cursor ready.
+
+        Works for all tracked ride types: coasters, water rides, transport
+        rides (mini railway), and tracked gentle rides (ghost train). The
+        ride object determines which track pieces are valid.
+
+        Station is placed as: beginStation -> middleStation x (n-2) -> endStation.
+        A 1-tile station uses a single endStation piece.
+
+        Args:
+            obj: The ride object (e.g. RideObjects.rollercoaster.TWISTER_TRAINS).
+            station_origin: Tile for the first station piece.
+            station_length: Number of station tiles (default 3, min 1).
+            direction: Station facing direction (default NORTH).
+            height: Height in land steps. Defaults to surface height.
+
+        Returns:
+            A TrackedRideEntity with cursor at station exit, ready for .place().
+
+        Raises:
+            ValueError: If station_length < 1 or object is a flat ride.
+            RuntimeError: If the ride object is not loaded.
+            ActionError: If placement fails.
+        """
+        if station_length < 1:
+            raise ValueError("station_length must be at least 1")
+
+        # Reject flat rides (they have an entry in RIDE_TYPE_TRACK_ELEMS)
+        if obj.ride_type in RIDE_TYPE_TRACK_ELEMS:
+            raise ValueError(
+                f"'{obj.name}' (ride type '{obj.ride_type}') is a flat ride. Use place_flat_ride() instead."
+            )
+
+        obj_index = self._client.objects._require_loaded_index(obj)
+        ride_type = _resolve_ride_type(obj)
+
+        # Create ride slot
+        result = self._client.actions.ride_create(
+            ride_type=ride_type,
+            ride_object=obj_index,
+            entrance_object=0,
+            colour1=0,
+            colour2=0,
+            inspection_interval=RideInspection.EVERY30_MINUTES,
+        )
+        ride_id = result["payload"]["ride"]
+
+        z = self._client.world.resolve_height(station_origin, height)
+
+        # Place station chain: all pieces use END_STATION.
+        # The game's TrackAddStationElement auto-classifies adjacent station
+        # tiles into begin/middle/end based on chain position. The C++ RTD's
+        # StartTrackPiece is typically endStation for tracked rides.
+        station_sequence = [TrackElemType.END_STATION] * station_length
+
+        pieces: list[PlacedPiece] = []
+        cursor_x = station_origin.x * TILE_SIZE
+        cursor_y = station_origin.y * TILE_SIZE
+        cursor_z = z
+        cursor_dir = direction
+        last_resp: dict = {}
+
+        try:
+            for track_type in station_sequence:
+                resp = self._client.actions.track_place(
+                    x=cursor_x,
+                    y=cursor_y,
+                    z=cursor_z,
+                    direction=cursor_dir,
+                    ride=ride_id,
+                    track_type=track_type,
+                    ride_type=ride_type,
+                    brake_speed=0,
+                    colour=0,
+                    seat_rotation=4,
+                    track_place_flags=SelectedLiftAndInverted(0),
+                    is_from_track_design=False,
+                )
+
+                pieces.append(
+                    PlacedPiece(
+                        track_type=track_type,
+                        x=cursor_x,
+                        y=cursor_y,
+                        z=cursor_z,
+                        direction=cursor_dir,
+                    )
+                )
+
+                # Advance cursor from enriched response
+                cursor_data = resp.get("cursor")
+                if cursor_data:
+                    cursor_x = cursor_data["x"]
+                    cursor_y = cursor_data["y"]
+                    cursor_z = cursor_data["z"]
+                    cursor_dir = Direction(cursor_data["direction"])
+                last_resp = resp
+        except ActionError:
+            # Clean up on failure
+            self._client.actions.ride_demolish(
+                ride=ride_id,
+                modify_type=RideModifyType.DEMOLISH,
+            )
+            raise
+
+        # Build cursor from last response
+        cursor = CursorPosition(
+            x=cursor_x,
+            y=cursor_y,
+            z=cursor_z,
+            direction=cursor_dir,
+        )
+        valid_next = [TrackElemType(v) for v in last_resp["validNext"]]
+        end_slope = last_resp["endSlope"]
+        end_bank = last_resp["endBank"]
+        begin_z_lookup = last_resp["beginZMap"]
+
+        # Fetch ride data
+        ride_data = self._client._query("rides", {"id": ride_id})
+        ride = Ride.model_validate(ride_data)
+
+        entity = TrackedRideEntity(
+            client=self._client,
+            model=ride,
+            ride_type=ride_type,
+            cursor=cursor,
+            valid_next=valid_next,
+            pieces=pieces,
+            end_slope=end_slope,
+            end_bank=end_bank,
+        )
+        entity._begin_z_lookup = begin_z_lookup
+        return entity
+
     def _create_ride(
         self,
         obj: RideObjectInfo,
@@ -691,7 +1136,15 @@ def _require_stall(obj: RideObjectInfo) -> None:
 
 
 def _resolve_ride_type(obj: RideObjectInfo) -> RideType:
-    """Convert a ride object's type string to the RideType enum."""
+    """Convert a ride object's type string to the RideType enum.
+
+    Uses RIDE_TYPE_STR_TO_INT (generated mapping from ride_type strings
+    to RideType int values) with a fallback to direct name matching.
+    """
+    int_val = RIDE_TYPE_STR_TO_INT.get(obj.ride_type)
+    if int_val is not None:
+        return RideType(int_val)
+    # Fall back to direct name match
     type_str = obj.ride_type.upper()
     try:
         return RideType[type_str]

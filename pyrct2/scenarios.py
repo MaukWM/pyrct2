@@ -25,6 +25,7 @@ class Scenario(StrEnum):
     TEST_PARK = str(_FIXTURES_DIR / "test_scenario.park")
     TEST_PARK_WITH_GUESTS = str(_FIXTURES_DIR / "test_scenario_with_guests.park")
     TEST_PARK_ALL_FLAT_RIDES = str(_FIXTURES_DIR / "test_scenario_all_flat_rides.park")
+    TEST_PARK_LARGE = str(_FIXTURES_DIR / "256x256_fixture.park")
 
     # ── Base Game — Beginner ─────────────────────────────────────────
     CRAZY_CASTLE = "Crazy Castle.SC6"
