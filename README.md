@@ -94,6 +94,16 @@ with RCT2.launch(Scenario.TEST_PARK, headless=False) as game:
         print(f"  {r.name}: {r.status}, excitement {r.excitement}")
 ```
 
+## Building tracked rides (beta)
+
+Tracked rides — coasters, water rides, transport rides, and tracked gentle
+rides — can be built piece by piece via `game.rides.create_tracked_ride()` and
+`.place()`. This is a new, beta feature and the API may change.
+
+See [`examples/`](examples/) for 12 worked layouts and its
+[README](examples/README.md) for the construction guide and circuit-geometry
+cheat sheet.
+
 ## Raw API
 
 All 82 game actions and state queries are available directly if you need something the high-level API doesn't wrap yet:

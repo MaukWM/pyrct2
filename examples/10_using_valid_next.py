@@ -41,7 +41,7 @@ with RCT2.launch(Scenario.TEST_PARK_LARGE) as game:
     coaster.place(TrackElemType.UP25_TO_FLAT)
 
     # Check if corkscrew is available for this ride type
-    print(f"\nAfter climb (flat at height):")
+    print("\nAfter climb (flat at height):")
     print(f"  Valid next: {[t.name for t in coaster.valid_next]}")
 
     if TrackElemType.LEFT_CORKSCREW_UP in coaster.valid_next:
@@ -49,7 +49,7 @@ with RCT2.launch(Scenario.TEST_PARK_LARGE) as game:
         coaster.place(TrackElemType.LEFT_CORKSCREW_UP)
 
         # After corkscrew UP, the suggested next piece chains automatically
-        print(f"\nAfter LEFT_CORKSCREW_UP:")
+        print("\nAfter LEFT_CORKSCREW_UP:")
         print(f"  Valid next: {[t.name for t in coaster.valid_next]}")
 
         if TrackElemType.RIGHT_CORKSCREW_DOWN in coaster.valid_next:

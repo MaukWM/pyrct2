@@ -7,7 +7,7 @@ from pyrct2._generated.objects import RideObjects
 from pyrct2.client import RCT2
 from pyrct2.errors import ActionError
 from pyrct2.park import RideEntity, TrackedRideEntity
-from pyrct2.result import CursorPosition, PlacedPiece, TrackPlaceResult, TrackRemoveResult
+from pyrct2.result import CursorPosition, TrackPlaceResult, TrackRemoveResult
 from pyrct2.scenarios import Scenario
 from pyrct2.world._tile import Tile
 
