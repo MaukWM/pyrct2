@@ -449,7 +449,7 @@ class Ride(BaseModel):
     classification: str
     name: str
     status: str
-    flags: int
+    flags: int | None = None
     lifecycleFlags: int
     mode: int
     departFlags: int

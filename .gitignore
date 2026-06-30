@@ -2,3 +2,12 @@
 .venv/
 
 local_scripts/
+
+# Python cache & build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Testing
+.pytest_cache/
+

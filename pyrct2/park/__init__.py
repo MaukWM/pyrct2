@@ -10,6 +10,7 @@ from pyrct2.park._paths import LineResult, PathsProxy
 from pyrct2.park._research import ResearchProxy
 from pyrct2.park._rides import RideEntity, RidesProxy, StationAccess, TrackedRideEntity
 from pyrct2.park._staff import StaffEntity, StaffProxy
+from pyrct2.park._td6 import DecodedRideDesign, TD6Parser, TrackPiece
 
 __all__ = [
     "ParkEntrance",
@@ -30,4 +31,7 @@ __all__ = [
     "StaffProxy",
     "StationAccess",
     "TrackedRideEntity",
+    "TD6Parser",
+    "DecodedRideDesign",
+    "TrackPiece",
 ]

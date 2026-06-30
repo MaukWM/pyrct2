@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict
 
 from pyrct2._generated.enums import (
+    Colour,
     Direction,
     EdgeBit,
     RideInspection,
@@ -18,7 +20,13 @@ from pyrct2._generated.enums import (
     TrackElemType,
 )
 from pyrct2._entity import EntityBase
-from pyrct2._generated.objects import RIDE_TYPE_STR_TO_INT, RIDE_TYPE_TRACK_ELEMS, RideObjectInfo
+from pyrct2._generated.objects import (
+    RIDE_TYPE_STR_TO_INT,
+    RIDE_TYPE_TRACK_ELEMS,
+    RideObjectInfo,
+    RideObjects,
+)
+from pyrct2.park._td6 import DecodedRideDesign, TD6Parser, _SCENERY_TYPE_MAP, _STATION_TRACK_TYPES
 from pyrct2._generated.state import Ride
 from pyrct2.errors import ActionError, QueryError
 from pyrct2.result import (
@@ -1062,6 +1070,178 @@ class RidesProxy:
         """Return all rides as entity wrappers."""
         return [RideEntity(self._client, r) for r in self._client.state.rides()]
 
+    def place_prebuilt_design(
+        self,
+        design_filepath: str,
+        tile: Tile,
+        obj: RideObjectInfo | None = None,
+        direction: Direction = Direction.NORTH,
+        height: int | None = None,
+    ) -> TrackedRideEntity:
+        """Place a prebuilt track design from a .TD6 file.
+
+        Args:
+            design_filepath: Path to the .TD6 file.
+            tile: The placement origin tile (where the first station piece is placed).
+            obj: RideObjectInfo override. If None, resolves the vehicle type
+                from the design file's header, raising an error if it is not loaded.
+            direction: Station orientation. Defaults to NORTH.
+            height: Height in land steps. Defaults to surface height.
+
+        Returns:
+            A TrackedRideEntity with the full track layout placed.
+
+        Raises:
+            FileNotFoundError: If the design file does not exist.
+            ValueError: If the vehicle object cannot be resolved from the design.
+            RuntimeError: If the resolved vehicle object is not loaded in the scenario.
+        """
+        # Parse the design file
+        design = TD6Parser.parse_file(design_filepath)
+
+        if obj is None:
+            obj = self._resolve_vehicle_object(design)
+
+        # Validate the vehicle object is loaded in the scenario
+        if not self._client.objects.is_loaded(obj):
+            raise RuntimeError(
+                f"Required vehicle object '{obj.name}' ({obj.identifier}) "
+                f"is not loaded in this scenario. Load it first using game.objects.load()."
+            )
+
+        # Create the tracked ride with the total station length from the design
+        total_station_pieces = sum(1 for p in design.pieces if p.track_type in _STATION_TRACK_TYPES)
+        coaster = self.create_tracked_ride(
+            obj=obj,
+            station_origin=tile,
+            station_length=total_station_pieces,
+            direction=direction,
+            height=height,
+        )
+
+        # Build the track piece-by-piece (skipping station pieces already placed)
+        for piece in design.pieces:
+            if piece.track_type in _STATION_TRACK_TYPES:
+                continue
+            coaster.place(
+                track_type=TrackElemType(piece.track_type),
+                chain_lift=piece.is_lift_hill,
+            )
+
+        self._place_decorations(design, tile, direction, coaster.pieces[0].z)
+
+        return coaster
+
+    def _place_decorations(
+        self,
+        design: DecodedRideDesign,
+        origin: Tile,
+        direction: Direction,
+        base_z: int,
+    ) -> None:
+        """Place scenery/decorations from a prebuilt design around the track."""
+        rot = (direction - Direction.NORTH) % 4
+
+        for dec in design.decorations:
+            mapping = _SCENERY_TYPE_MAP.get(dec.scenery_type)
+            if mapping is None:
+                continue
+            obj_type, prefix = mapping
+
+            identifier = f"{prefix}.{dec.dat_name.lower()}"
+            obj_index = self._resolve_scenery_index(obj_type, identifier)
+            if obj_index is None:
+                continue
+
+            dx, dy = _to_signed_byte(dec.x), _to_signed_byte(dec.y)
+            rx, ry = _rotate_offset(dx, dy, rot)
+            target = origin.offset(rx, ry)
+
+            dz = _to_signed_byte(dec.z)
+            target_z = base_z + dz * 2
+
+            r_dir = Direction((dec.direction + rot) % 4)
+            p_col = Colour(dec.primary_colour) if dec.primary_colour < 54 else Colour.BLACK
+            s_col = Colour(dec.secondary_colour) if dec.secondary_colour < 54 else Colour.BLACK
+
+            try:
+                wx, wy = target.to_world()
+                if dec.scenery_type == 1:
+                    self._client.actions.small_scenery_place(
+                        x=wx, y=wy, z=target_z, direction=r_dir,
+                        quadrant=(dec.quadrant + rot) % 4,
+                        object=obj_index,
+                        primary_colour=p_col, secondary_colour=s_col,
+                        tertiary_colour=Colour.BLACK,
+                    )
+                elif dec.scenery_type == 2:
+                    self._client.actions.large_scenery_place(
+                        x=wx, y=wy, z=target_z, direction=r_dir,
+                        object=obj_index,
+                        primary_colour=p_col, secondary_colour=s_col,
+                        tertiary_colour=Colour.BLACK,
+                    )
+                elif dec.scenery_type == 3:
+                    self._client.actions.wall_place(
+                        x=wx, y=wy, z=target_z, edge=r_dir,
+                        object=obj_index,
+                        primary_colour=p_col, secondary_colour=s_col,
+                        tertiary_colour=Colour.BLACK,
+                    )
+            except ActionError:
+                warnings.warn(
+                    f"Failed to place scenery '{identifier}' at {target}",
+                    stacklevel=2,
+                )
+
+    def _resolve_scenery_index(self, obj_type: str, identifier: str) -> int | None:
+        """Look up or load a scenery object, returning its slot index or None."""
+        try:
+            res = self._client._query("get_object", {"type": obj_type, "identifier": identifier})
+            return res["index"]
+        except QueryError as e:
+            if e.error != "not_loaded":
+                raise
+
+        try:
+            res = self._client._query("load_object", {"identifier": identifier})
+            return res["index"]
+        except Exception:
+            warnings.warn(
+                f"Scenery object '{identifier}' could not be loaded",
+                stacklevel=2,
+            )
+            return None
+
+    @staticmethod
+    def _resolve_vehicle_object(design: DecodedRideDesign) -> RideObjectInfo:
+        """Resolve the vehicle RideObjectInfo from a decoded design.
+
+        TD6 files store the original DAT filename at offset 0x80 (the
+        ``vehicle_name`` field).  OpenRCT2 object identifiers follow the
+        pattern ``rct2.ride.<dat_name>``, so the lookup is a single O(1)
+        dict hit via ``RideObjects.by_identifier()``.
+
+        Raises:
+            ValueError: If the vehicle name is missing/invalid or not in
+                the object catalog.
+        """
+        name = design.vehicle_name
+        if not (name and name.isascii() and any(c.isalnum() for c in name)):
+            raise ValueError(
+                f"Design has no usable vehicle name (got '{name}'). "
+                f"Pass obj= explicitly to place_prebuilt_design()."
+            )
+
+        identifier = f"rct2.ride.{name.lower()}"
+        obj = RideObjects.by_identifier(identifier)
+        if obj is None:
+            raise ValueError(
+                f"Vehicle object '{identifier}' not found in the object catalog. "
+                f"Pass obj= explicitly to place_prebuilt_design()."
+            )
+        return obj
+
 
 # ── Helpers ───────────────────────────────────────────────────────────
 
@@ -1175,3 +1355,20 @@ def _resolve_track_type(obj: RideObjectInfo) -> TrackElemType:
             f"Use place_flat_ride() only for flat rides and stalls."
         )
     return TrackElemType(track_value)
+
+
+def _to_signed_byte(value: int) -> int:
+    """Interpret a TD6 unsigned byte as a signed offset (-128..127)."""
+    return value - 256 if value >= 128 else value
+
+
+def _rotate_offset(dx: int, dy: int, rot: int) -> tuple[int, int]:
+    """Rotate a tile offset by rot * 90° clockwise."""
+    if rot == 0:
+        return dx, dy
+    if rot == 1:
+        return -dy, dx
+    if rot == 2:
+        return -dx, -dy
+    return dy, -dx
+
