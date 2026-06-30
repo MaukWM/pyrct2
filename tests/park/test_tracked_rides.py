@@ -2,7 +2,7 @@
 
 import pytest
 
-from pyrct2._generated.enums import Direction, TrackElemType
+from pyrct2._generated.enums import Colour, Direction, TrackElemType
 from pyrct2._generated.objects import RideObjects
 from pyrct2.client import RCT2
 from pyrct2.errors import ActionError
@@ -544,3 +544,71 @@ def test_all_cardinal_directions(game_large):
         assert len(coaster.pieces) == 3
         result = coaster.place(TrackElemType.FLAT)
         assert isinstance(result, TrackPlaceResult)
+
+
+def test_place_prebuilt_design_scenery(game_large):
+    """Place a prebuilt design and verify its decorations are rotated and placed."""
+    from unittest.mock import patch
+    from pyrct2.park._td6 import DecodedRideDesign, TrackPiece, DecodedScenery
+
+    mock_design = DecodedRideDesign(
+        ride_type=2,
+        vehicle_index=0,
+        vehicle_name="WOODTRAI",
+        station_length=2,
+        pieces=[
+            TrackPiece(1, 0, False, False, 0),  # station
+            TrackPiece(1, 0, False, False, 0),  # station
+            TrackPiece(0, 0, False, False, 0),  # flat
+        ],
+        decorations=[
+            DecodedScenery(
+                scenery_type=1, version=8, dat_name="WWOODEN",
+                x=2, y=1, z=0, direction=0, quadrant=0,
+                primary_colour=1, secondary_colour=2,
+            ),
+            DecodedScenery(
+                scenery_type=2, version=8, dat_name="PAGODA",
+                x=254, y=0, z=8, direction=1, quadrant=0,
+                primary_colour=3, secondary_colour=4,
+            ),
+        ],
+    )
+
+    original_query = game_large._query
+    def mock_query(name, params=None):
+        if name in ("get_object", "load_object"):
+            return {"index": 5}
+        return original_query(name, params)
+
+    with patch("pyrct2.park._td6.TD6Parser.parse_file", return_value=mock_design), \
+         patch.object(game_large, "_query", side_effect=mock_query), \
+         patch.object(game_large.actions, "small_scenery_place") as mock_small, \
+         patch.object(game_large.actions, "large_scenery_place") as mock_large:
+
+        coaster = game_large.rides.place_prebuilt_design(
+            design_filepath="mock.td6",
+            tile=Tile(100, 100),
+            obj=RideObjects.rollercoaster.LADYBIRD_TRAINS,
+            direction=Direction.EAST,
+        )
+
+        assert coaster is not None
+        base_z = coaster.pieces[0].z
+
+        # Small scenery: (dx=2, dy=1) rotated 90° → (-1, 2) → Tile(99, 102)
+        mock_small.assert_called_once_with(
+            x=99 * 32, y=102 * 32, z=base_z,
+            direction=Direction.NORTH, quadrant=1, object=5,
+            primary_colour=Colour.GREY, secondary_colour=Colour.WHITE,
+            tertiary_colour=Colour.BLACK,
+        )
+
+        # Large scenery: (dx=-2, dy=0) rotated 90° → (0, -2) → Tile(100, 98)
+        mock_large.assert_called_once_with(
+            x=100 * 32, y=98 * 32, z=base_z + 16,
+            direction=Direction.EAST, object=5,
+            primary_colour=Colour.DARK_PURPLE, secondary_colour=Colour.LIGHT_PURPLE,
+            tertiary_colour=Colour.BLACK,
+        )
+
